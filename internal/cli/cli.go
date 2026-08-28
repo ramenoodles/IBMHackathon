@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"grepwrapper/internal/search"
+	"grepwrapper/internal/source"
 )
 
 const usage = `Usage:
@@ -28,6 +29,41 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	language := flags.String("lang", "auto", "language: auto, go, python, javascript, typescript, rust, java, c, cpp, or csharp")
 	limit := flags.Int("max", 20, "maximum number of results to print")
 	rgBinary := flags.String("rg", "rg", "path to the ripgrep executable")
+	sourceMode := flags.String(
+		"source",
+		"match",
+		"source output: match, context, or file",
+	)
+
+	before := flags.Int(
+		"before",
+		5,
+		"number of lines before a match in context mode",
+	)
+
+	after := flags.Int(
+		"after",
+		20,
+		"number of lines after a match in context mode",
+	)
+
+	switch *sourceMode {
+	case "match", "context", "file":
+	default:
+		fmt.Fprintln(stderr, "grepwrapper: -source must be match, context, or file")
+		return 2
+	}
+
+	if *before < 0 {
+		fmt.Fprintln(stderr, "grepwrapper: -before must not be negative")
+		return 2
+	}
+
+	if *after < 0 {
+		fmt.Fprintln(stderr, "grepwrapper: -after must not be negative")
+		return 2
+	}
+
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, usage)
 		flags.PrintDefaults()
@@ -62,8 +98,85 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	for _, match := range matches {
-		fmt.Fprintf(stdout, "%s:%d: %s\n", match.Path, match.Line, strings.TrimSpace(match.Text))
+	if *sourceMode == "match" {
+		for _, match := range matches {
+			fmt.Fprintf(
+				stdout,
+				"%s:%d: %s\n",
+				match.Path,
+				match.Line,
+				strings.TrimSpace(match.Text),
+			)
+		}
+		return 0
 	}
+
+	reader, err := source.NewReader(*root)
+	if err != nil {
+		fmt.Fprintf(stderr, "grepwrapper: %v\n", err)
+		return 2
+	}
+
+	switch *sourceMode {
+	case "context":
+		for _, match := range matches {
+			snippet, err := reader.ReadContext(
+				match.Path,
+				match.Line,
+				*before,
+				*after,
+			)
+			if err != nil {
+				fmt.Fprintf(
+					stderr,
+					"grepwrapper: read %s: %v\n",
+					match.Path,
+					err,
+				)
+				return 2
+			}
+
+			fmt.Fprintf(
+				stdout,
+				"=== %s:%d-%d ===\n",
+				snippet.Path,
+				snippet.StartLine,
+				snippet.EndLine,
+			)
+
+			fmt.Fprintln(stdout, snippet.Content)
+		}
+
+	case "file":
+		seen := make(map[string]struct{})
+
+		for _, match := range matches {
+			// Avoid printing the same file several times when multiple
+			// declarations matched inside it
+			if _, exists := seen[match.Path]; exists {
+				continue
+			}
+			seen[match.Path] = struct{}{}
+
+			content, err := reader.ReadFile(match.Path)
+			if err != nil {
+				fmt.Fprintf(
+					stderr,
+					"grepwrapper: read %s: %v\n",
+					match.Path,
+					err,
+				)
+				return 2
+			}
+
+			fmt.Fprintf(stdout, "=== %s ===\n", match.Path)
+			fmt.Fprint(stdout, content)
+
+			if !strings.HasSuffix(content, "\n") {
+				fmt.Fprintln(stdout)
+			}
+		}
+	}
+
 	return 0
 }

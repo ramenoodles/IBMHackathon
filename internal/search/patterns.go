@@ -37,6 +37,7 @@ var languageProfiles = []languageProfile{
 		patterns: []string{
 			`^[[:space:]]*(?:export[[:space:]]+)?(?:default[[:space:]]+)?(?:async[[:space:]]+)?function[[:space:]]+\*?[[:space:]]*{{name}}[[:space:]]*\(`,
 			`^[[:space:]]*(?:export[[:space:]]+)?(?:const|let|var)[[:space:]]+{{name}}[[:space:]]*=[[:space:]]*(?:async[[:space:]]+)?(?:function\b|\(?[^=;]*\)?[[:space:]]*=>)`,
+			`^[[:space:]]*(?:(?:static|async|get|set)[[:space:]]+)*\*?[[:space:]]*{{name}}[[:space:]]*\([^)]*\)[[:space:]]*\{`,
 		},
 	},
 	{
