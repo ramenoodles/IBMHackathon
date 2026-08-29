@@ -1,0 +1,18 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-onbober-primary: #ff3366;
+  --color-onbober-surface: #0f172a;
+  --color-onbober-panel: #1e293b;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  @apply bg-slate-950 text-slate-100 antialiased;
+}

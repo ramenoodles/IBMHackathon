@@ -1,0 +1,77 @@
+# OnBober
+
+An onboarding compass for complex codebases. Pick a symbol, map its execution flow, expand branches lazily, and get tailored explanations at each step.
+
+## Project Structure
+
+```
+IBMHackathon/
+├── frontend/     # Vue 3 graph-first UI
+└── backend/      # Go API with ripgrep scanner and Ollama JSON graphs
+```
+
+## Prerequisites
+
+- **Node.js** 22+ and **npm**
+- **Go** 1.22+
+- **ripgrep** (`rg`) on PATH
+- **git** on PATH (for GitHub clone option)
+- **Ollama** running locally with a model pulled (e.g. `ollama pull llama3.2`)
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8080` | Backend API port |
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama base URL |
+| `OLLAMA_MODEL` | `llama3.2` | Model name for graph generation |
+| `ONBOBER_WORKSPACE_ROOT` | `%TEMP%/onbober-workspaces` | Storage for cloned/uploaded repos |
+
+## Development
+
+```bash
+# Terminal 1 — Backend
+cd backend
+go run ./cmd/api
+
+# Terminal 2 — Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173
+
+## Demo Flow
+
+1. Complete onboarding (language, experience, workspace path / GitHub / zip)
+2. Open a file from the explorer
+3. Click a **symbol chip** in the code drawer
+4. View the **execution flow graph** in the center panel
+5. Click a **collapsed branch** (`+N`) to expand with a branch budget prompt
+6. Click any step to see **node details** in the right drawer
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/health` | Health check |
+| GET | `/api/tree?workspace=&dir=` | Directory listing |
+| GET | `/api/file?workspace=&path=` | File contents |
+| POST | `/api/graph/root` | Root execution-flow graph for a symbol |
+| POST | `/api/graph/expand` | Lazy-expand collapsed branch nodes |
+| GET | `/api/graph/node` | Detailed explanation for a node |
+| POST | `/api/workspace/setup` | Register local path or clone GitHub repo |
+| POST | `/api/workspace/upload` | Extract uploaded zip archive |
+| POST | `/api/analyze` | *(deprecated)* Legacy SSE markdown analysis |
+
+## IBM Bob Handoff
+
+- Graph system prompt: [`backend/prompts/graph_system.txt`](backend/prompts/graph_system.txt)
+- Graph builder with verified/inferred confidence merging: [`backend/internal/graph/builder.go`](backend/internal/graph/builder.go)
+- Bounded expansion limits: max 8 root nodes, 6 expand nodes, depth 4
+
+## Notes
+
+- If Ollama is offline, the backend returns a demo graph so the UI remains fully interactive.
+- Branch expansion requires explicit user confirmation to prevent compute bombs on large codebases.
