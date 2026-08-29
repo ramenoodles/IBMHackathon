@@ -3,10 +3,12 @@ import type { GraphRootPayload } from '@/types/flowGraph'
 import { enrichSymbolNodes, fetchGraphRoot } from '@/utils/flowGraphEnrich'
 import {
   ENRICHMENT_HORIZON_DEPTH,
+  INITIAL_VISIBLE_COUNT,
+  SILENT_BUFFER_STEPS,
   WARM_CONCURRENCY,
-  WARM_REVEAL_COUNT,
   createSymbolFlowState,
   enrichmentHorizon,
+  silentPrefetchTargets,
 } from '@/utils/flowGraphUtils'
 import type { useFlowGraphCache } from '@/composables/useFlowGraphCache'
 
@@ -39,11 +41,17 @@ export function useFileFlowWarm(cache: ReturnType<typeof useFlowGraphCache>) {
       progress.value = { ...progress.value, currentSymbol: sym }
       const fullPayload: GraphRootPayload = { ...payload, symbol: sym }
       const graph = await fetchGraphRoot(fullPayload)
-      const state = createSymbolFlowState(graph, WARM_REVEAL_COUNT)
-      const revealed = [...state.revealedIds]
-      const frontier = revealed[revealed.length - 1] ?? state.rootId
+      const state = createSymbolFlowState(graph, INITIAL_VISIBLE_COUNT)
+      const buffer = silentPrefetchTargets(
+        state.rootId,
+        state.allNodes,
+        state.allEdges,
+        INITIAL_VISIBLE_COUNT,
+        SILENT_BUFFER_STEPS,
+      )
+      const frontier = buffer.at(-1) ?? state.rootId
       const horizon = enrichmentHorizon(frontier, state.allEdges, ENRICHMENT_HORIZON_DEPTH, state.enrichedIds)
-      const toEnrich = [...new Set([...revealed, ...horizon])]
+      const toEnrich = [...new Set([state.rootId, ...buffer, ...horizon])]
       await enrichSymbolNodes(state, fullPayload, toEnrich, inFlight)
       cache.set(payload.filePath, sym, state)
       progress.value = {

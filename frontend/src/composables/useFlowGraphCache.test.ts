@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { useFlowGraphCache } from '@/composables/useFlowGraphCache'
 import type { SymbolFlowState } from '@/utils/flowGraphUtils'
 
-function mockState(symbol: string): SymbolFlowState {
+function mockState(symbol: string, fullyExpanded = false): SymbolFlowState {
   return {
     allNodes: [{ id: 'n1', label: symbol, summary: '', kind: 'entry', confidence: 'verified', expandable: false, childCount: 0, collapsed: false }],
     allEdges: [],
@@ -11,6 +11,7 @@ function mockState(symbol: string): SymbolFlowState {
     enrichedIds: new Set(),
     isMock: false,
     parentPath: [],
+    fullyExpanded,
   }
 }
 
@@ -28,5 +29,11 @@ describe('useFlowGraphCache', () => {
     cache.set('file.py', 'a', mockState('a'))
     cache.set('file.py', 'b', mockState('b'))
     expect(cache.listSymbolsForFile('file.py').sort()).toEqual(['a', 'b'])
+  })
+
+  it('round-trips fullyExpanded flag', () => {
+    const cache = useFlowGraphCache()
+    cache.set('file.py', 'fn', mockState('fn', true))
+    expect(cache.get('file.py', 'fn')?.fullyExpanded).toBe(true)
   })
 })

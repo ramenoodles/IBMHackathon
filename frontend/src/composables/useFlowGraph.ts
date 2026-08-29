@@ -1,6 +1,5 @@
 import { ref } from 'vue'
 import type {
-  EnrichPatch,
   FlowEdge,
   FlowGraph,
   FlowNode,
@@ -10,10 +9,17 @@ import type {
 import { enrichSymbolNodes, fetchGraphRoot } from '@/utils/flowGraphEnrich'
 import {
   ENRICHMENT_HORIZON_DEPTH,
+  SILENT_BUFFER_STEPS,
+  entryOnlyRevealedIds,
   enrichmentHorizon,
+  revealedPathLength,
+  silentPrefetchTargets,
   type SymbolFlowState,
+  visibleFrontierId,
 } from '@/utils/flowGraphUtils'
 import type { useFlowGraphCache } from '@/composables/useFlowGraphCache'
+
+const MAX_EXPAND_DEPTH = 4
 
 /**
  * Manages scan-first flow graph with cache, progressive reveal, and async LLM labels.
@@ -31,6 +37,8 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
   const loading = ref(false)
   const enriching = ref(false)
   const expanding = ref(false)
+  const mappingFullFlow = ref(false)
+  const fullyExpanded = ref(false)
   const error = ref<string | null>(null)
   const isMock = ref(false)
   const parentPath = ref<string[]>([])
@@ -47,6 +55,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
       enrichedIds: new Set(enrichedIds.value),
       isMock: isMock.value,
       parentPath: [...parentPath.value],
+      fullyExpanded: fullyExpanded.value,
     }
   }
 
@@ -59,11 +68,17 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     allNodes.value = state.allNodes.map((n) => ({ ...n }))
     allEdges.value = [...state.allEdges]
     rootId.value = state.rootId
-    revealedIds.value = new Set(state.revealedIds)
     enrichedIds.value = new Set(state.enrichedIds)
     isMock.value = state.isMock
     parentPath.value = [...state.parentPath]
+    fullyExpanded.value = state.fullyExpanded ?? false
     symbol.value = sym
+
+    if (fullyExpanded.value) {
+      revealedIds.value = new Set(state.allNodes.map((n) => n.id))
+    } else {
+      revealedIds.value = entryOnlyRevealedIds(state.rootId, state.allNodes, state.allEdges)
+    }
     syncVisible()
   }
 
@@ -71,18 +86,6 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     const revealed = revealedIds.value
     nodes.value = allNodes.value.filter((n) => revealed.has(n.id))
     edges.value = allEdges.value.filter((e) => revealed.has(e.from) && revealed.has(e.to))
-  }
-
-  function applyPatches(patches: EnrichPatch[]): void {
-    for (const patch of patches) {
-      const node = allNodes.value.find((n) => n.id === patch.id)
-      if (!node) continue
-      if (patch.title) node.title = patch.title
-      if (patch.summary) node.summary = patch.summary
-      enrichedIds.value.add(patch.id)
-    }
-    syncVisible()
-    persistToCache()
   }
 
   async function enrichNodes(nodeIds: string[], opts?: { background?: boolean }): Promise<void> {
@@ -105,25 +108,43 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     }
   }
 
-  function prefetchAroundNode(nodeId: string): void {
-    const payload = lastPayload.value
-    if (!payload) return
+  function maintainSilentBuffer(): void {
+    if (fullyExpanded.value || !rootId.value || !lastPayload.value) return
 
-    const ids: string[] = []
-    if (!enrichedIds.value.has(nodeId)) ids.push(nodeId)
-    ids.push(
-      ...enrichmentHorizon(nodeId, allEdges.value, ENRICHMENT_HORIZON_DEPTH, enrichedIds.value),
+    const visibleCount = revealedPathLength(
+      rootId.value,
+      allNodes.value,
+      allEdges.value,
+      revealedIds.value,
     )
-    const unique = [...new Set(ids)].filter((id) => !enrichedIds.value.has(id))
-    if (unique.length) void enrichNodes(unique, { background: true })
+    const buffer = silentPrefetchTargets(
+      rootId.value,
+      allNodes.value,
+      allEdges.value,
+      visibleCount,
+      SILENT_BUFFER_STEPS,
+    )
+    const frontier =
+      visibleFrontierId(rootId.value, allNodes.value, allEdges.value, revealedIds.value) ||
+      rootId.value
+    const horizon = enrichmentHorizon(frontier, allEdges.value, ENRICHMENT_HORIZON_DEPTH, enrichedIds.value)
+    const toEnrich = [...new Set([...buffer, ...horizon])].filter((id) => !enrichedIds.value.has(id))
+    if (toEnrich.length) void enrichNodes(toEnrich, { background: true })
+  }
+
+  function prefetchAroundNode(_nodeId: string): void {
+    maintainSilentBuffer()
   }
 
   function hasHiddenChildren(nodeId: string): boolean {
+    if (fullyExpanded.value) return false
     const revealed = revealedIds.value
     return allEdges.value.some((e) => e.from === nodeId && !revealed.has(e.to))
   }
 
   function revealFromNode(nodeId: string): string[] {
+    if (fullyExpanded.value) return []
+
     const revealed = new Set(revealedIds.value)
     const newly: string[] = []
     for (const edge of allEdges.value) {
@@ -136,13 +157,12 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     revealedIds.value = revealed
     syncVisible()
     persistToCache()
-    void enrichNodes(newly)
-    for (const id of newly) prefetchAroundNode(id)
-    prefetchAroundNode(nodeId)
+    void enrichNodes(newly, { background: true })
+    maintainSilentBuffer()
     return newly
   }
 
-  function mergeFragment(fragment: FlowGraph): void {
+  function mergeFragment(fragment: FlowGraph, revealAll = false): void {
     const existingIds = new Set(allNodes.value.map((n) => n.id))
     for (const node of fragment.nodes) {
       if (!existingIds.has(node.id)) {
@@ -163,8 +183,95 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
       expanded.collapsed = false
       expanded.expandable = false
     }
+    if (revealAll || fullyExpanded.value) {
+      for (const node of fragment.nodes) {
+        revealedIds.value.add(node.id)
+      }
+      revealedIds.value = new Set(revealedIds.value)
+    }
     syncVisible()
     persistToCache()
+  }
+
+  function revealAllKnownNodes(): void {
+    for (const node of allNodes.value) {
+      revealedIds.value.add(node.id)
+    }
+    revealedIds.value = new Set(revealedIds.value)
+    syncVisible()
+  }
+
+  function collapsedExpandableNodes(): FlowNode[] {
+    return allNodes.value.filter((n) => n.collapsed && n.expandable)
+  }
+
+  async function fetchExpandFragment(
+    nodeId: string,
+    payload: Omit<GraphExpandPayload, 'nodeId' | 'parentPath' | 'expandLimit'>,
+    path: string[],
+    limit: number,
+  ): Promise<FlowGraph | null> {
+    const res = await fetch('/api/graph/expand', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...payload,
+        nodeId,
+        parentPath: path,
+        expandLimit: limit,
+      }),
+    })
+    if (!res.ok) return null
+    return (await res.json()) as FlowGraph
+  }
+
+  async function revealFullFlow(
+    payload: Omit<GraphExpandPayload, 'nodeId' | 'parentPath' | 'expandLimit'>,
+  ): Promise<void> {
+    if (fullyExpanded.value || mappingFullFlow.value) return
+
+    mappingFullFlow.value = true
+    error.value = null
+
+    try {
+      let guard = 0
+      while (guard < 32) {
+        guard++
+        revealAllKnownNodes()
+
+        const collapsed = collapsedExpandableNodes()
+        if (collapsed.length === 0) break
+
+        let expandedAny = false
+        for (const node of collapsed) {
+          if (parentPath.value.length >= MAX_EXPAND_DEPTH) continue
+          const path = [...parentPath.value, node.id]
+          const fragment = await fetchExpandFragment(
+            node.id,
+            payload,
+            path,
+            node.childCount || 6,
+          )
+          if (!fragment) continue
+          mergeFragment(fragment, true)
+          parentPath.value = path
+          expandedAny = true
+        }
+        if (!expandedAny) break
+      }
+
+      revealAllKnownNodes()
+
+      const allIds = allNodes.value.map((n) => n.id)
+      await enrichNodes(allIds, { background: false })
+
+      fullyExpanded.value = true
+      persistToCache()
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to map full flow'
+    } finally {
+      mappingFullFlow.value = false
+    }
   }
 
   function activateSymbol(sym: string, payload: GraphRootPayload): boolean {
@@ -175,8 +282,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     currentWorkspace.value = payload.workspacePath
     lastPayload.value = { ...payload, symbol: sym }
     hydrateFromState(cached, sym)
-    const frontier = [...revealedIds.value].at(-1) ?? rootId.value
-    if (frontier) prefetchAroundNode(frontier)
+    maintainSilentBuffer()
     return true
   }
 
@@ -195,6 +301,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     lastPayload.value = payload
     enrichedIds.value = new Set()
     inFlightIds.value = new Set()
+    fullyExpanded.value = false
     revealedIds.value = new Set()
 
     try {
@@ -205,15 +312,12 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
       isMock.value = Boolean(data.mock) && data.nodes.length === 0
 
       if (data.rootId) {
-        revealedIds.value = new Set([data.rootId])
+        revealedIds.value = entryOnlyRevealedIds(data.rootId, data.nodes, data.edges)
       }
       syncVisible()
       loading.value = false
       persistToCache()
-      if (data.rootId) {
-        void enrichNodes([data.rootId])
-        prefetchAroundNode(data.rootId)
-      }
+      maintainSilentBuffer()
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load graph'
       allNodes.value = []
@@ -229,23 +333,15 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     payload: Omit<GraphExpandPayload, 'nodeId' | 'parentPath' | 'expandLimit'>,
     limit = 3,
   ): Promise<void> {
+    if (fullyExpanded.value) return
+
     expanding.value = true
     error.value = null
     const path = [...parentPath.value, nodeId]
 
     try {
-      const res = await fetch('/api/graph/expand', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...payload,
-          nodeId,
-          parentPath: path,
-          expandLimit: limit,
-        }),
-      })
-      if (!res.ok) throw new Error(`Expand failed (${res.status})`)
-      const fragment = (await res.json()) as FlowGraph
+      const fragment = await fetchExpandFragment(nodeId, payload, path, limit)
+      if (!fragment) throw new Error('Expand failed')
       mergeFragment(fragment)
       parentPath.value = path
       const newIds = fragment.nodes.map((n) => n.id).filter((id) => !revealedIds.value.has(id))
@@ -256,8 +352,8 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
       syncVisible()
       persistToCache()
       if (newIds.length) {
-        void enrichNodes(newIds)
-        for (const id of newIds) prefetchAroundNode(id)
+        void enrichNodes(newIds, { background: true })
+        maintainSilentBuffer()
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Expand failed'
@@ -278,6 +374,8 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     symbol.value = ''
     error.value = null
     isMock.value = false
+    fullyExpanded.value = false
+    mappingFullFlow.value = false
     parentPath.value = []
     lastPayload.value = null
   }
@@ -290,6 +388,8 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     loading,
     enriching,
     expanding,
+    mappingFullFlow,
+    fullyExpanded,
     error,
     isMock,
     currentFilePath,
@@ -298,6 +398,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     activateSymbol,
     expandNode,
     revealFromNode,
+    revealFullFlow,
     hasHiddenChildren,
     prefetchAroundNode,
     reset,

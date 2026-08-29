@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  INITIAL_VISIBLE_COUNT,
+  SILENT_BUFFER_STEPS,
   bfsNodeIds,
   createSymbolFlowState,
   enrichmentHorizon,
+  silentPrefetchTargets,
 } from '@/utils/flowGraphUtils'
 import type { FlowEdge, FlowNode } from '@/types/flowGraph'
 
@@ -29,6 +32,19 @@ describe('bfsNodeIds', () => {
   })
 })
 
+describe('silentPrefetchTargets', () => {
+  it('returns next buffer steps without including visible nodes', () => {
+    expect(silentPrefetchTargets('a', nodes, edges, INITIAL_VISIBLE_COUNT, SILENT_BUFFER_STEPS)).toEqual([
+      'b',
+      'c',
+    ])
+  })
+
+  it('returns empty when buffer is zero', () => {
+    expect(silentPrefetchTargets('a', nodes, edges, 1, 0)).toEqual([])
+  })
+})
+
 describe('enrichmentHorizon', () => {
   it('collects nodes within depth hops', () => {
     const horizon = enrichmentHorizon('a', edges, 2)
@@ -37,7 +53,15 @@ describe('enrichmentHorizon', () => {
 })
 
 describe('createSymbolFlowState', () => {
-  it('pre-reveals first N nodes', () => {
+  it('reveals only entry by default', () => {
+    const state = createSymbolFlowState(
+      { rootId: 'a', nodes, edges, depth: 1, symbol: 'fn' },
+    )
+    expect([...state.revealedIds]).toEqual(['a'])
+    expect(state.fullyExpanded).toBe(false)
+  })
+
+  it('pre-reveals first N nodes when requested', () => {
     const state = createSymbolFlowState(
       { rootId: 'a', nodes, edges, depth: 1, symbol: 'fn' },
       3,

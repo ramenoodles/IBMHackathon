@@ -5,7 +5,15 @@
 import type { FlowEdge, FlowNode, NodeDetail } from '@/types/flowGraph'
 import { computed, ref, watch } from 'vue'
 import { nodeDisplayTitle, useFlowMermaid } from '@/composables/useFlowMermaid'
+import { useWorkspaceLayout } from '@/composables/useWorkspaceLayout'
 import { edgeOrder } from '@/utils/flowGraphUtils'
+
+const {
+  tracePanelOpen,
+  detailPanelOpen,
+  toggleTracePanel,
+  toggleDetailPanel,
+} = useWorkspaceLayout()
 
 const props = defineProps<{
   nodes: FlowNode[]
@@ -14,6 +22,8 @@ const props = defineProps<{
   loading: boolean
   enriching: boolean
   expanding: boolean
+  mappingFullFlow: boolean
+  fullyExpanded: boolean
   error: string | null
   isMock: boolean
   symbol: string
@@ -27,6 +37,7 @@ const emit = defineEmits<{
   selectNode: [node: FlowNode]
   expandNode: [node: FlowNode]
   revealNode: [node: FlowNode]
+  showFullFlow: []
   viewSource: []
   goToDefinition: [file: string, line: number]
 }>()
@@ -34,7 +45,7 @@ const emit = defineEmits<{
 const mermaidContainer = ref<HTMLElement | null>(null)
 
 function onNodeClick(node: FlowNode): void {
-  if (node.collapsed && node.expandable) {
+  if (!props.fullyExpanded && node.collapsed && node.expandable) {
     emit('expandNode', node)
     return
   }
@@ -83,8 +94,16 @@ const orderedNodes = computed(() => {
 })
 
 const selectedNode = computed(() => props.nodes.find((n) => n.id === props.selectedNodeId))
+const hasDetailContent = computed(
+  () => Boolean(props.selectedNodeId && (props.detail || props.detailLoading || selectedNode.value)),
+)
 const showExpandHint = computed(
-  () => props.nodes.length === 1 && props.rootId && props.hasHiddenChildren(props.rootId),
+  () =>
+    !props.fullyExpanded &&
+    !props.mappingFullFlow &&
+    props.nodes.length === 1 &&
+    props.rootId &&
+    props.hasHiddenChildren(props.rootId),
 )
 
 function kindLabel(kind: string): string {
@@ -119,12 +138,53 @@ function kindLabel(kind: string): string {
         <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-2">
           <p class="text-xs text-slate-500">
             Tracing <span class="font-mono text-slate-300">{{ symbol }}</span>
-            <span v-if="expanding" class="ml-2 text-onbober-primary">Expanding...</span>
-            <span v-if="enriching" class="ml-2 text-amber-400">Enhancing labels...</span>
+            <span v-if="mappingFullFlow" class="ml-2 text-onbober-primary">Mapping full flow...</span>
+            <span v-else-if="expanding" class="ml-2 text-onbober-primary">Expanding...</span>
           </p>
-          <div class="flex items-center gap-3 text-[10px] text-slate-500">
-            <span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-sm border border-green-500 bg-green-900/40" /> structure</span>
-            <span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-sm border border-dashed border-amber-500 bg-amber-900/40" /> AI label</span>
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1">
+              <button
+                type="button"
+                class="rounded px-2 py-1 text-[10px] font-medium transition"
+                :class="
+                  tracePanelOpen
+                    ? 'bg-slate-800 text-slate-300'
+                    : 'text-slate-500 hover:bg-slate-800 hover:text-slate-300'
+                "
+                :aria-pressed="tracePanelOpen"
+                title="Toggle steps panel"
+                @click="toggleTracePanel"
+              >
+                Steps
+              </button>
+              <button
+                v-if="hasDetailContent"
+                type="button"
+                class="rounded px-2 py-1 text-[10px] font-medium transition"
+                :class="
+                  detailPanelOpen
+                    ? 'bg-slate-800 text-slate-300'
+                    : 'text-slate-500 hover:bg-slate-800 hover:text-slate-300'
+                "
+                :aria-pressed="detailPanelOpen"
+                title="Toggle details panel"
+                @click="toggleDetailPanel"
+              >
+                Details
+              </button>
+            </div>
+            <button
+              v-if="!fullyExpanded && !mappingFullFlow"
+              type="button"
+              class="rounded-md border border-slate-700 px-2.5 py-1 text-[11px] font-medium text-slate-300 transition hover:border-onbober-primary/50 hover:text-white"
+              @click="emit('showFullFlow')"
+            >
+              Show full flow
+            </button>
+            <div class="flex items-center gap-3 text-[10px] text-slate-500">
+              <span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-sm border border-green-500 bg-green-900/40" /> structure</span>
+              <span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-sm border border-dashed border-amber-500 bg-amber-900/40" /> AI label</span>
+            </div>
           </div>
         </div>
 
@@ -135,7 +195,35 @@ function kindLabel(kind: string): string {
         <p v-if="error" class="shrink-0 px-4 py-2 text-sm text-red-400">{{ error }}</p>
 
         <div class="flex min-h-0 flex-1">
-          <ol class="w-72 shrink-0 overflow-y-auto border-r border-slate-800 bg-slate-900/40 p-2">
+          <button
+            v-if="!tracePanelOpen"
+            type="button"
+            class="flex w-8 shrink-0 flex-col items-center justify-center gap-1 border-r border-slate-800 bg-slate-900/60 text-slate-500 transition hover:bg-slate-800 hover:text-slate-200"
+            aria-label="Show steps panel"
+            title="Show steps"
+            @click="toggleTracePanel"
+          >
+            <span class="text-sm">›</span>
+            <span class="text-[9px] font-medium uppercase tracking-wide [writing-mode:vertical-rl]">Steps</span>
+          </button>
+
+          <div
+            v-else
+            class="flex w-72 shrink-0 flex-col border-r border-slate-800 bg-slate-900/40"
+          >
+            <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-2 py-1.5">
+              <span class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Steps</span>
+              <button
+                type="button"
+                class="rounded px-1.5 py-0.5 text-slate-500 hover:bg-slate-800 hover:text-white"
+                aria-label="Hide steps panel"
+                title="Hide steps"
+                @click="toggleTracePanel"
+              >
+                ‹
+              </button>
+            </div>
+            <ol class="min-h-0 flex-1 overflow-y-auto p-2">
             <li v-for="(node, i) in orderedNodes" :key="node.id" class="mb-1">
               <button
                 type="button"
@@ -176,8 +264,15 @@ function kindLabel(kind: string): string {
               </button>
             </li>
           </ol>
+          </div>
 
-          <div class="min-w-0 flex-1 overflow-auto bg-slate-950/50 p-4">
+          <div class="relative min-w-0 flex-1 overflow-auto bg-slate-950/50 p-4">
+            <div
+              v-if="mappingFullFlow"
+              class="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm"
+            >
+              <p class="text-sm text-slate-300">Mapping full flow for {{ symbol }}...</p>
+            </div>
             <div
               ref="mermaidContainer"
               class="mermaid-flow mx-auto flex min-h-[180px] min-w-fit items-center justify-center"
@@ -188,10 +283,35 @@ function kindLabel(kind: string): string {
       </template>
     </div>
 
-    <aside
-      v-if="selectedNodeId && (detail || detailLoading || selectedNode)"
-      class="w-72 shrink-0 overflow-y-auto border-l border-slate-800 bg-slate-900 p-4"
+    <button
+      v-if="hasDetailContent && !detailPanelOpen"
+      type="button"
+      class="flex w-8 shrink-0 flex-col items-center justify-center gap-1 border-l border-slate-800 bg-slate-900/60 text-slate-500 transition hover:bg-slate-800 hover:text-slate-200"
+      aria-label="Show details panel"
+      title="Show details"
+      @click="toggleDetailPanel"
     >
+      <span class="text-sm">‹</span>
+      <span class="text-[9px] font-medium uppercase tracking-wide [writing-mode:vertical-rl]">Details</span>
+    </button>
+
+    <aside
+      v-else-if="hasDetailContent && detailPanelOpen"
+      class="flex w-72 shrink-0 flex-col border-l border-slate-800 bg-slate-900"
+    >
+      <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-3 py-2">
+        <span class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Details</span>
+        <button
+          type="button"
+          class="rounded px-1.5 py-0.5 text-slate-500 hover:bg-slate-800 hover:text-white"
+          aria-label="Hide details panel"
+          title="Hide details"
+          @click="toggleDetailPanel"
+        >
+          ›
+        </button>
+      </div>
+      <div class="min-h-0 flex-1 overflow-y-auto p-4">
       <p v-if="detailLoading" class="text-sm text-slate-500">Loading...</p>
       <template v-else>
         <h3 class="font-semibold text-white">{{ selectedNode ? nodeDisplayTitle(selectedNode) : detail?.title }}</h3>
@@ -205,7 +325,7 @@ function kindLabel(kind: string): string {
         >{{ selectedNode.code }}</pre>
         <p v-if="detail" class="mt-3 text-sm leading-relaxed text-slate-300">{{ detail.explanation }}</p>
         <p
-          v-if="selectedNode && hasHiddenChildren(selectedNode.id)"
+          v-if="selectedNode && !fullyExpanded && hasHiddenChildren(selectedNode.id)"
           class="mt-3 text-xs text-onbober-primary"
         >
           Click again to reveal the next step{{ selectedNode.kind === 'branch' ? 's (branches)' : '' }}.
@@ -229,6 +349,7 @@ function kindLabel(kind: string): string {
           </button>
         </div>
       </template>
+      </div>
     </aside>
   </div>
 </template>

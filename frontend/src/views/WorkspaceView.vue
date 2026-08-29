@@ -32,12 +32,15 @@ const {
   loading,
   enriching,
   expanding,
+  mappingFullFlow,
+  fullyExpanded,
   error: graphError,
   isMock,
   loadRoot,
   activateSymbol,
   expandNode,
   revealFromNode,
+  revealFullFlow,
   hasHiddenChildren,
   prefetchAroundNode,
   reset: resetGraph,
@@ -181,6 +184,10 @@ function onConfirmExpand(limit: number): void {
   branchNode.value = null
 }
 
+function onShowFullFlow(): void {
+  void revealFullFlow(graphPayload())
+}
+
 function fileName(): string {
   return selectedPath.value.split('/').pop() ?? selectedPath.value
 }
@@ -206,8 +213,20 @@ function fileName(): string {
     </header>
 
     <div class="flex min-h-0 flex-1">
+      <button
+        v-if="!sidebarOpen"
+        type="button"
+        class="flex w-8 shrink-0 flex-col items-center justify-center gap-1 border-r border-slate-800 bg-slate-900/80 text-slate-500 transition hover:bg-slate-800 hover:text-slate-200"
+        aria-label="Show file explorer"
+        title="Show files"
+        @click="toggleSidebar"
+      >
+        <span class="text-sm">›</span>
+        <span class="text-[9px] font-medium uppercase tracking-wide [writing-mode:vertical-rl]">Files</span>
+      </button>
+
       <Sidebar
-        v-show="sidebarOpen || !isMobile"
+        v-show="sidebarOpen"
         :workspace-path="userContext.workspacePath"
         :selected-path="selectedPath"
         @select="onSelectFile"
@@ -243,6 +262,8 @@ function fileName(): string {
           :loading="loading"
           :enriching="enriching"
           :expanding="expanding"
+          :mapping-full-flow="mappingFullFlow"
+          :fully-expanded="fullyExpanded"
           :error="graphError"
           :is-mock="isMock"
           :symbol="symbol"
@@ -253,6 +274,7 @@ function fileName(): string {
           @select-node="onSelectNode"
           @reveal-node="onRevealNode"
           @expand-node="onExpandNode"
+          @show-full-flow="onShowFullFlow"
           @view-source="onViewSource()"
           @go-to-definition="onGoToDefinition"
         />
