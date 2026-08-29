@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { api } from '@/api'
 import type { FileSymbol } from '@/utils/flowGraphUtils'
 import { LARGE_FILE_SYMBOL_THRESHOLD } from '@/utils/flowGraphUtils'
 
@@ -21,10 +22,7 @@ export function useSymbolBrief() {
     loading.value = true
     error.value = null
     try {
-      const params = new URLSearchParams({ path: filePath })
-      const res = await fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/symbols?${params}`)
-      if (!res.ok) throw new Error(`Symbol scan failed (${res.status})`)
-      const data = (await res.json()) as { symbols: FileSymbol[]; count: number }
+      const data = await api.symbols<FileSymbol>(workspaceId, filePath)
       symbols.value = data.symbols ?? []
       isLargeFile.value = symbols.value.length > LARGE_FILE_SYMBOL_THRESHOLD
     } catch (err) {

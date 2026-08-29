@@ -1,5 +1,7 @@
+import { api } from '@/api'
+
 /**
- * File tree entry returned by the backend /api/tree endpoint.
+ * File tree entry returned by the workspace tree endpoint.
  */
 export interface TreeEntry {
   name: string
@@ -14,15 +16,6 @@ export interface TreeEntry {
  * @returns List of files and folders with paths relative to workspace root.
  */
 export async function fetchTreeEntries(workspace: string, dir = ''): Promise<TreeEntry[]> {
-  const params = new URLSearchParams()
-  if (dir) params.set('dir', dir)
-
-  const res = await fetch(`/api/workspaces/${encodeURIComponent(workspace)}/tree?${params}`)
-  if (!res.ok) {
-    const msg = await res.text()
-    throw new Error(msg || `Failed to load tree (${res.status})`)
-  }
-
-  const data = (await res.json()) as { entries: TreeEntry[] }
+  const data = await api.tree<TreeEntry>(workspace, dir)
   return data.entries ?? []
 }

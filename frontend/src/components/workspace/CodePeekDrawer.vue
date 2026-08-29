@@ -3,6 +3,7 @@
  * Collapsible bottom drawer showing source code at a node's file/line.
  */
 import { highlightCode, languageFromPath } from '@/composables/useShiki'
+import { api } from '@/api'
 import { ref, watch } from 'vue'
 
 const props = defineProps<{
@@ -23,10 +24,7 @@ async function load(): Promise<void> {
   if (!props.open || !props.workspaceId || !props.filePath) return
   loading.value = true
   try {
-    const params = new URLSearchParams({ path: props.filePath })
-    const res = await fetch(`/api/workspaces/${encodeURIComponent(props.workspaceId)}/file?${params}`)
-    if (!res.ok) return
-    const data = (await res.json()) as { content: string; language: string }
+    const data = await api.file(props.workspaceId, props.filePath)
     html.value = await highlightCode(data.content, data.language || languageFromPath(props.filePath))
   } finally {
     loading.value = false

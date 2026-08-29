@@ -18,6 +18,7 @@ import {
   visibleFrontierId,
 } from '@/utils/flowGraphUtils'
 import type { useFlowGraphCache } from '@/composables/useFlowGraphCache'
+import { api } from '@/api'
 
 const MAX_EXPAND_DEPTH = 4
 
@@ -211,18 +212,11 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     path: string[],
     limit: number,
   ): Promise<FlowGraph | null> {
-    const res = await fetch(`/api/workspaces/${encodeURIComponent(payload.workspaceId)}/graphs/expand`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...payload,
-        nodeId,
-        parentPath: path,
-        expandLimit: limit,
-      }),
-    })
-    if (!res.ok) return null
-    return (await res.json()) as FlowGraph
+    try {
+      return await api.expand({ ...payload, nodeId, parentPath: path, expandLimit: limit })
+    } catch {
+      return null
+    }
   }
 
   async function revealFullFlow(

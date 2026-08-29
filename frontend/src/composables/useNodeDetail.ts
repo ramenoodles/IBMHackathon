@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import type { FlowConfidence, NodeDetail } from '@/types/flowGraph'
+import { api } from '@/api'
 
 export interface NodeDetailParams {
   workspaceId: string
@@ -99,9 +100,7 @@ export function useNodeDetail() {
     }
 
     try {
-      const res = await fetch(`/api/workspaces/${encodeURIComponent(params.workspaceId)}/explain`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: params.symbol, question: 'Explain this step.', language: params.language }), signal })
-      if (!res.ok) throw new Error(`Detail failed (${res.status})`)
-      const parsed = (await res.json()) as NodeDetail
+      const parsed = await api.explain(params.workspaceId, { name: params.symbol, question: 'Explain this step.', language: params.language }, signal)
       detail.value = { ...detail.value, ...parsed, id: params.nodeId, title: params.title ?? params.nodeId, summary: params.summary ?? '' }
       setCached(params, detail.value)
     } catch (err) {
@@ -116,8 +115,7 @@ export function useNodeDetail() {
 
   async function loadDetailStream(params: NodeDetailParams, signal: AbortSignal): Promise<void> {
     const q = buildQuery(params)
-    const res = await fetch(`/api/workspaces/${encodeURIComponent(params.workspaceId)}/explain`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: params.symbol, question: 'Explain this step.', language: params.language }), signal })
-    if (!res.ok) throw new Error(`Detail stream failed (${res.status})`)
+    const res = await api.explainStream(params.workspaceId, { name: params.symbol, question: 'Explain this step.', language: params.language }, signal)
 
     const reader = res.body?.getReader()
     if (!reader) throw new Error('Response body is not readable')
