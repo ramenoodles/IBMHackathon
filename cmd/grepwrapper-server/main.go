@@ -39,8 +39,8 @@ func main() {
 
 	model := flag.String(
 		"model",
-		"",
-		"Watsonx model ID",
+		os.Getenv("WATSONX_MODEL"),
+		"Watsonx model ID (defaults to WATSONX_MODEL)",
 	)
 
 	flag.Parse()
@@ -61,7 +61,7 @@ func main() {
 		log.Printf("Watsonx enabled with model %s", *model)
 	} else {
 		log.Println(
-			"Watsonx disabled: WATSONX_API_KEY, WATSONX_PROJECT_ID, or -model not configured",
+			"Watsonx disabled: WATSONX_API_KEY, WATSONX_PROJECT_ID, or WATSONX_MODEL/-model not configured",
 		)
 	}
 

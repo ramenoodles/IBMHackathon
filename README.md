@@ -86,6 +86,16 @@ The search and source packages are kept separate so they can later be reused by 
 
 A REST API is being added for programmatic symbol lookup.
 
+Run the server with Watsonx configured through a local `.env` file:
+
+```sh
+cp .env.example .env
+go run ./cmd/grepwrapper-server -root .
+```
+
+The server loads `WATSONX_API_KEY`, `WATSONX_PROJECT_ID`, and `WATSONX_MODEL` from `.env`.
+The `-model` flag overrides `WATSONX_MODEL` when supplied.
+
 Planned endpoint:
 
 ```http
