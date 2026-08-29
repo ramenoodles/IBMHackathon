@@ -6,6 +6,7 @@ import { ref } from 'vue'
 import FileTreeNode from './FileTreeNode.vue'
 import type { TreeEntry } from '@/composables/useFileTree'
 import { fetchTreeEntries } from '@/composables/useFileTree'
+import { getFileIconUrl, getFolderIconUrl } from '@/composables/useFileIcon'
 
 const props = defineProps<{
   /** Workspace root path. */
@@ -72,7 +73,7 @@ function onFileClick(): void {
       @click="onFolderClick"
     >
       <span class="w-4 shrink-0 text-xs text-slate-500">{{ expanded ? '▼' : '▶' }}</span>
-      <span class="shrink-0">📁</span>
+      <img :src="getFolderIconUrl(entry.name, expanded)" alt="" class="h-4 w-4 shrink-0" />
       <span class="truncate text-slate-300">{{ entry.name }}</span>
     </button>
 
@@ -84,7 +85,7 @@ function onFileClick(): void {
       :style="{ paddingLeft: `calc(${indent} + 16px)` }"
       @click="onFileClick"
     >
-      <span class="shrink-0">📄</span>
+      <img :src="getFileIconUrl(entry.name)" alt="" class="h-4 w-4 shrink-0" />
       <span class="truncate">{{ entry.name }}</span>
     </button>
 
