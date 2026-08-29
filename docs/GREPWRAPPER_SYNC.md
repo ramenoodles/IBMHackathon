@@ -4,6 +4,8 @@ OnBober imports Jack's [`grepWrapper`](https://github.com/ramenoodles/IBMHackath
 
 **Not imported:** `grepWrapper-agentic` (Watsonx agentic work stays on your branch).
 
+**For OnBober contributors** (how search fits the app, not git sync): see [GREPWRAPPER.md](GREPWRAPPER.md) and [CODEBASE.md](CODEBASE.md).
+
 ## Monorepo layout
 
 ```

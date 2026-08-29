@@ -1,5 +1,9 @@
 package scanner
 
+// GrepLiteral searches the workspace for a fixed string (not a symbol declaration).
+//
+// This is OnBober-specific: used by deep-dive evidence gathering in graph/deep_dive_context.go.
+// Symbol declaration search uses grepwrapper via grep.go instead.
 import (
 	"bufio"
 	"bytes"

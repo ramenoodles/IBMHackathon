@@ -1,4 +1,8 @@
 // Package scanner provides filesystem and ripgrep utilities for codebase analysis.
+//
+// Symbol declaration search is delegated to the grepwrapper module (see
+// grepwrapper_adapter.go and docs/GREPWRAPPER.md). Fixed-string literal
+// search for deep-dive evidence lives in grep_literal.go.
 package scanner
 
 import (

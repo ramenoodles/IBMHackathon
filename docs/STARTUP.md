@@ -287,5 +287,7 @@ Then open **http://localhost:5173**.
 ## Related docs
 
 - [README](../README.md) — project overview, API list, architecture notes
+- [CODEBASE.md](CODEBASE.md) — full repo tour for new contributors
+- [GREPWRAPPER.md](GREPWRAPPER.md) — symbol search architecture
 - [GREPWRAPPER_SYNC.md](GREPWRAPPER_SYNC.md) — sync Jack's grepWrapper subtree
 - IBM Bob handoff notes in README → `backend/internal/graph/builder.go`

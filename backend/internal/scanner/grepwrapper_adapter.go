@@ -1,5 +1,13 @@
 package scanner
 
+// grepwrapper_adapter wires OnBober's scanner to Jack's grepwrapper module.
+//
+// OnBober code should call GrepSymbol / GrepSymbolLang (grep.go), not this file
+// directly. The adapter maps OnBober's Match type to bridge.Finder results and
+// preserves soft-fail behavior when ripgrep is unavailable.
+//
+// See docs/GREPWRAPPER.md for architecture and ownership boundaries.
+
 import (
 	"context"
 	"os"

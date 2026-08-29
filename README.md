@@ -2,6 +2,17 @@
 
 An onboarding compass for complex codebases. Pick a symbol, map its execution flow, expand branches lazily, and get tailored explanations at each step.
 
+## Documentation
+
+| Doc | Who it's for |
+|-----|----------------|
+| [docs/README.md](docs/README.md) | Documentation index |
+| [docs/STARTUP.md](docs/STARTUP.md) | Run the app locally |
+| [docs/CODEBASE.md](docs/CODEBASE.md) | **New here?** Architecture, request flow, where to edit |
+| [docs/GREPWRAPPER.md](docs/GREPWRAPPER.md) | How symbol search integrates with the backend |
+| [docs/GREPWRAPPER_SYNC.md](docs/GREPWRAPPER_SYNC.md) | Sync Jack's `grepWrapper` git subtree |
+| [backend/README.md](backend/README.md) | Backend package map and endpoints |
+
 ## Project Structure
 
 ```
@@ -31,8 +42,9 @@ IBMHackathon/
 
 ## Development
 
-**→ Full setup and run instructions: [docs/STARTUP.md](docs/STARTUP.md)**  
-**→ grepWrapper subtree sync (Jack): [docs/GREPWRAPPER_SYNC.md](docs/GREPWRAPPER_SYNC.md)**
+**→ Full setup: [docs/STARTUP.md](docs/STARTUP.md)**  
+**→ Codebase tour: [docs/CODEBASE.md](docs/CODEBASE.md)**  
+**→ grepWrapper sync (Jack): [docs/GREPWRAPPER_SYNC.md](docs/GREPWRAPPER_SYNC.md)**
 
 Quick start:
 
