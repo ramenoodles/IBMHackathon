@@ -93,8 +93,8 @@ cp .env.example .env
 go run ./cmd/grepwrapper-server -root .
 ```
 
-The server loads `WATSONX_API_KEY`, `WATSONX_PROJECT_ID`, and `WATSONX_MODEL` from `.env`.
-The `-model` flag overrides `WATSONX_MODEL` when supplied.
+The server loads `WATSONX_API_KEY`, `WATSONX_PROJECT_ID`, `WATSONX_MODEL`, `HOST`, and `PORT` from `.env`.
+The `-model` flag overrides `WATSONX_MODEL`, and `-addr` overrides `HOST`/`PORT`, when supplied.
 
 Planned endpoint:
 

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 
@@ -25,10 +26,16 @@ func main() {
 		"codebase directory to expose",
 	)
 
+	host := os.Getenv("HOST")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	address := flag.String(
 		"addr",
-		":8080",
-		"HTTP listen address",
+		net.JoinHostPort(host, port),
+		"HTTP listen address (defaults to HOST:PORT / :8080)",
 	)
 
 	rgBinary := flag.String(
