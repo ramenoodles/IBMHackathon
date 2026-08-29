@@ -20,8 +20,6 @@ import {
 import type { useFlowGraphCache } from '@/composables/useFlowGraphCache'
 import { api } from '@/api'
 
-const MAX_EXPAND_DEPTH = 4
-
 /**
  * Manages scan-first flow graph with cache, progressive reveal, and async LLM labels.
  */
@@ -238,8 +236,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
 
         let expandedAny = false
         for (const node of collapsed) {
-          if (parentPath.value.length >= MAX_EXPAND_DEPTH) continue
-          const path = [...parentPath.value, node.id]
+          const path = [node.id]
           const fragment = await fetchExpandFragment(
             node.id,
             payload,
@@ -248,7 +245,6 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
           )
           if (!fragment) continue
           mergeFragment(fragment, true)
-          parentPath.value = path
           expandedAny = true
         }
         if (!expandedAny) break
@@ -259,7 +255,10 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
       const allIds = allNodes.value.map((n) => n.id)
       await enrichNodes(allIds, { background: false })
 
-      fullyExpanded.value = true
+      fullyExpanded.value = collapsedExpandableNodes().length === 0
+      if (!fullyExpanded.value) {
+        error.value = 'Some flow branches could not be expanded'
+      }
       persistToCache()
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to map full flow'
@@ -331,7 +330,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
 
     expanding.value = true
     error.value = null
-    const path = [...parentPath.value, nodeId]
+    const path = [nodeId]
 
     try {
       const fragment = await fetchExpandFragment(nodeId, payload, path, limit)

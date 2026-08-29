@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
@@ -139,10 +138,8 @@ func (h *Handler) file(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, e.Error())
 		return
 	}
-	write(w, 200, map[string]any{"path": p, "content": data, "language": filepath.Ext(p)})
+	write(w, 200, map[string]any{"path": p, "content": data, "language": analysis.LanguageFromPath(p)})
 }
-
-var decl = regexp.MustCompile(`(?m)^\s*(?:func\s+(?:\([^)]*\)\s+)?|(?:async\s+)?def\s+|class\s+|(?:pub\s+)?fn\s+)([A-Za-z_]\w*)`)
 
 func (h *Handler) symbols(w http.ResponseWriter, r *http.Request) {
 	ws, ok := h.get(w, r)
@@ -160,15 +157,7 @@ func (h *Handler) symbols(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, e.Error())
 		return
 	}
-	type sym struct {
-		Name string `json:"name"`
-		Line int    `json:"line"`
-	}
-	out := []sym{}
-	for _, m := range decl.FindAllStringSubmatchIndex(text, -1) {
-		name := text[m[2]:m[3]]
-		out = append(out, sym{name, 1 + strings.Count(text[:m[0]], "\n")})
-	}
+	out := analysis.ExtractSymbols(text, p)
 	write(w, 200, map[string]any{"symbols": out, "count": len(out)})
 }
 func (h *Handler) graph(w http.ResponseWriter, r *http.Request) {
@@ -180,7 +169,7 @@ func (h *Handler) graph(w http.ResponseWriter, r *http.Request) {
 		FilePath string `json:"filePath"`
 		Symbol   string `json:"symbol"`
 	}
-	if json.NewDecoder(r.Body).Decode(&in) != nil || in.Symbol == "" {
+	if json.NewDecoder(r.Body).Decode(&in) != nil || in.FilePath == "" || in.Symbol == "" {
 		fail(w, 400, "filePath and symbol are required")
 		return
 	}
@@ -202,11 +191,14 @@ func (h *Handler) expand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		NodeID           string `json:"nodeId"`
-		FilePath, Symbol string
+		NodeID      string   `json:"nodeId"`
+		FilePath    string   `json:"filePath"`
+		Symbol      string   `json:"symbol"`
+		ParentPath  []string `json:"parentPath"`
+		ExpandLimit int      `json:"expandLimit"`
 	}
-	if json.NewDecoder(r.Body).Decode(&in) != nil {
-		fail(w, 400, "invalid JSON")
+	if json.NewDecoder(r.Body).Decode(&in) != nil || in.NodeID == "" {
+		fail(w, 400, "nodeId is required")
 		return
 	}
 	b, e := analysis.New(ws.Root, h.RGBinary)
@@ -214,12 +206,7 @@ func (h *Handler) expand(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, e.Error())
 		return
 	}
-	g, e := b.Root(r.Context(), in.FilePath, in.Symbol)
-	if e != nil {
-		fail(w, 404, e.Error())
-		return
-	}
-	g, e = b.Expand(r.Context(), g, in.NodeID, 3)
+	g, e := b.Expand(r.Context(), in.NodeID, in.ExpandLimit)
 	if e != nil {
 		fail(w, 404, e.Error())
 		return

@@ -14,3 +14,8 @@
 Workspace IDs are opaque and filesystem paths are never returned to clients.
 Graph analysis works without Watsonx. Explanations require the Watsonx
 environment variables documented in the repository README.
+
+Graph roots are deterministic, function-local control-flow graphs for the
+requested file and symbol. Root responses contain at most eight nodes;
+resolved call nodes can be expanded into callee fragments containing at most
+six nodes, through four call levels.

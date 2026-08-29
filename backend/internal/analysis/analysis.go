@@ -2,13 +2,20 @@ package analysis
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"path/filepath"
+	"strconv"
+	"strings"
+
 	"github.com/ramenoodles/IBMHackathon/backend/internal/search"
 	"github.com/ramenoodles/IBMHackathon/backend/internal/source"
-	"path/filepath"
-	"regexp"
-	"sort"
-	"strings"
+)
+
+const (
+	MaxRootNodes   = 8
+	MaxExpandNodes = 6
+	MaxDepth       = 4
 )
 
 type Node struct {
@@ -28,11 +35,13 @@ type Node struct {
 	Confidence   string `json:"confidence"`
 	Code         string `json:"code,omitempty"`
 }
+
 type Edge struct {
 	From  string `json:"from"`
 	To    string `json:"to"`
 	Label string `json:"label,omitempty"`
 }
+
 type Graph struct {
 	RootID string `json:"rootId"`
 	Nodes  []Node `json:"nodes"`
@@ -40,85 +49,177 @@ type Graph struct {
 	Depth  int    `json:"depth"`
 	Symbol string `json:"symbol"`
 }
+
 type Builder struct {
 	finder *search.Finder
 	reader *source.Reader
 }
 
 func New(root, rg string) (*Builder, error) {
-	r, e := source.NewReader(root)
-	if e != nil {
-		return nil, e
+	reader, err := source.NewReader(root)
+	if err != nil {
+		return nil, err
 	}
-	return &Builder{search.NewFinder(rg), r}, nil
+	return &Builder{finder: search.NewFinder(rg), reader: reader}, nil
 }
 
-var callRE = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\s*\(`)
-
+// Root builds a bounded control-flow graph for symbol in the requested file.
 func (b *Builder) Root(ctx context.Context, file, symbol string) (Graph, error) {
-	matches, err := b.finder.Find(ctx, search.Query{Name: symbol, Root: b.reader.Root(), Limit: 1})
+	if strings.TrimSpace(file) == "" || strings.TrimSpace(symbol) == "" {
+		return Graph{}, fmt.Errorf("filePath and symbol are required")
+	}
+	return b.buildFunction(ctx, filepath.ToSlash(filepath.Clean(file)), symbol, 1, MaxRootNodes, true)
+}
+
+// Expand returns a bounded callee CFG fragment. The existing call node remains
+// the fragment root so the frontend can merge the result without replacing it.
+func (b *Builder) Expand(ctx context.Context, nodeID string, limit int) (Graph, error) {
+	meta, err := parseNodeID(nodeID)
 	if err != nil {
 		return Graph{}, err
 	}
-	if len(matches) == 0 {
-		return Graph{}, fmt.Errorf("symbol %q not found", symbol)
+	if meta.Depth >= MaxDepth {
+		return Graph{}, fmt.Errorf("max flow depth reached")
 	}
-	return b.build(ctx, matches[0].Path, matches[0].Line, symbol, 0, map[string]bool{})
-}
-func (b *Builder) build(ctx context.Context, file string, line int, symbol string, depth int, seen map[string]bool) (Graph, error) {
-	id := nodeID(file, line, symbol)
-	if seen[id] {
-		return Graph{RootID: id, Symbol: symbol, Depth: depth}, nil
-	}
-	seen[id] = true
-	snip, err := b.reader.ReadContext(file, line, 0, 30)
+
+	container, err := b.buildFunction(ctx, meta.File, meta.Symbol, meta.Depth, MaxRootNodes, false)
 	if err != nil {
 		return Graph{}, err
 	}
-	n := Node{ID: id, Label: symbol, Title: symbol, Summary: strings.TrimSpace(snip.Content), Kind: "function", File: file, Line: line, Confidence: "verified", Code: snip.Content}
-	g := Graph{RootID: id, Nodes: []Node{n}, Symbol: symbol, Depth: depth}
-	if depth >= 4 {
-		return g, nil
-	}
-	names := map[string]bool{}
-	for _, m := range callRE.FindAllStringSubmatch(snip.Content, -1) {
-		if m[1] != symbol {
-			names[m[1]] = true
+	var call *Node
+	for i := range container.Nodes {
+		if container.Nodes[i].ID == nodeID {
+			call = &container.Nodes[i]
+			break
 		}
 	}
-	list := make([]string, 0, len(names))
-	for name := range names {
-		list = append(list, name)
+	if call == nil {
+		return Graph{}, fmt.Errorf("flow node %q not found", nodeID)
 	}
-	sort.Strings(list)
-	for _, name := range list {
-		ms, e := b.finder.Find(ctx, search.Query{Name: name, Root: b.reader.Root(), Limit: 1})
-		if e != nil {
-			continue
-		}
-		if len(ms) == 0 {
-			continue
-		}
-		child, e := b.build(ctx, ms[0].Path, ms[0].Line, name, depth+1, seen)
-		if e != nil {
-			continue
-		}
-		g.Nodes = append(g.Nodes, child.Nodes...)
-		g.Edges = append(g.Edges, Edge{From: id, To: child.RootID, Label: "calls"})
+	if !call.Expandable || call.CalleeFile == "" || call.CalleeSymbol == "" {
+		return Graph{}, fmt.Errorf("flow node %q is not expandable", nodeID)
 	}
-	g.Nodes[0].ChildCount = len(g.Edges)
-	g.Nodes[0].Expandable = len(g.Edges) > 0
-	g.Nodes[0].Collapsed = false
-	return g, nil
+
+	if limit <= 0 || limit > MaxExpandNodes {
+		limit = MaxExpandNodes
+	}
+	fragment, err := b.buildFunction(ctx, call.CalleeFile, call.CalleeSymbol, meta.Depth+1, limit, false)
+	if err != nil {
+		return Graph{}, err
+	}
+	if len(fragment.Nodes) == 0 {
+		return Graph{}, fmt.Errorf("callee %q has no flow steps", call.CalleeSymbol)
+	}
+	fragment.Edges = append([]Edge{{From: nodeID, To: fragment.RootID, Label: "calls"}}, fragment.Edges...)
+	fragment.RootID = nodeID
+	return fragment, nil
 }
-func nodeID(file string, line int, symbol string) string {
-	return filepath.ToSlash(file) + ":" + fmt.Sprint(line) + ":" + symbol
+
+func (b *Builder) buildFunction(ctx context.Context, file, symbol string, depth, limit int, truncationMarker bool) (Graph, error) {
+	if err := ctx.Err(); err != nil {
+		return Graph{}, err
+	}
+	content, err := b.reader.ReadFile(file)
+	if err != nil {
+		return Graph{}, err
+	}
+	steps, err := extractFlow(content, file, symbol)
+	if err != nil {
+		return Graph{}, err
+	}
+	graph := buildCFG(file, symbol, depth, steps, limit, truncationMarker)
+	if depth < MaxDepth {
+		b.resolveCalls(ctx, &graph, content)
+	}
+	return graph, nil
 }
-func (b *Builder) Expand(ctx context.Context, g Graph, nodeID string, limit int) (Graph, error) {
-	for _, n := range g.Nodes {
-		if n.ID == nodeID {
-			return b.build(ctx, n.File, n.Line, n.Label, g.Depth+1, map[string]bool{nodeID: true})
+
+func (b *Builder) resolveCalls(ctx context.Context, graph *Graph, currentContent string) {
+	language := LanguageFromPath(graph.Nodes[0].File)
+	cache := make(map[string]calleeTarget)
+	for i := range graph.Nodes {
+		node := &graph.Nodes[i]
+		if node.Kind != "call" || node.CalleeSymbol == "" {
+			continue
+		}
+		target, ok := cache[node.CalleeSymbol]
+		if !ok {
+			target = b.resolveCallee(ctx, node.File, currentContent, node.CalleeSymbol, language)
+			cache[node.CalleeSymbol] = target
+		}
+		if target.File == "" || target.ChildCount == 0 {
+			continue
+		}
+		node.CalleeFile = target.File
+		node.CalleeLine = target.Line
+		node.ChildCount = target.ChildCount
+		node.Expandable = true
+		node.Collapsed = true
+	}
+}
+
+type calleeTarget struct {
+	File       string
+	Line       int
+	ChildCount int
+}
+
+func (b *Builder) resolveCallee(ctx context.Context, currentFile, currentContent, symbol, language string) calleeTarget {
+	if steps, err := extractFlow(currentContent, currentFile, symbol); err == nil {
+		return calleeTarget{File: currentFile, Line: steps[0].Line, ChildCount: flowChildCount(steps)}
+	}
+
+	matches, err := b.finder.Find(ctx, search.Query{
+		Name: symbol, Root: b.reader.Root(), Language: language, Limit: 10,
+	})
+	if err != nil {
+		return calleeTarget{}
+	}
+	for _, match := range matches {
+		content, readErr := b.reader.ReadFile(match.Path)
+		if readErr != nil {
+			continue
+		}
+		steps, flowErr := extractFlow(content, match.Path, symbol)
+		if flowErr == nil {
+			return calleeTarget{File: filepath.ToSlash(match.Path), Line: steps[0].Line, ChildCount: flowChildCount(steps)}
 		}
 	}
-	return Graph{}, fmt.Errorf("node %q not found", nodeID)
+	return calleeTarget{}
+}
+
+func flowChildCount(steps []flowStep) int {
+	if len(steps) <= 1 {
+		return 0
+	}
+	return len(steps) - 1
+}
+
+type nodeMetadata struct {
+	Depth   int
+	File    string
+	Symbol  string
+	Line    int
+	Ordinal int
+}
+
+func makeNodeID(file, symbol string, depth, line, ordinal int) string {
+	encode := base64.RawURLEncoding.EncodeToString
+	return fmt.Sprintf("flow:%d:%s:%s:%d:%d", depth, encode([]byte(filepath.ToSlash(file))), encode([]byte(symbol)), line, ordinal)
+}
+
+func parseNodeID(id string) (nodeMetadata, error) {
+	parts := strings.Split(id, ":")
+	if len(parts) != 6 || parts[0] != "flow" {
+		return nodeMetadata{}, fmt.Errorf("invalid flow node id")
+	}
+	depth, depthErr := strconv.Atoi(parts[1])
+	line, lineErr := strconv.Atoi(parts[4])
+	ordinal, ordinalErr := strconv.Atoi(parts[5])
+	file, fileErr := base64.RawURLEncoding.DecodeString(parts[2])
+	symbol, symbolErr := base64.RawURLEncoding.DecodeString(parts[3])
+	if depthErr != nil || lineErr != nil || ordinalErr != nil || fileErr != nil || symbolErr != nil || depth < 1 || line < 1 || ordinal < 0 || len(file) == 0 || len(symbol) == 0 {
+		return nodeMetadata{}, fmt.Errorf("invalid flow node id")
+	}
+	return nodeMetadata{Depth: depth, File: string(file), Symbol: string(symbol), Line: line, Ordinal: ordinal}, nil
 }
