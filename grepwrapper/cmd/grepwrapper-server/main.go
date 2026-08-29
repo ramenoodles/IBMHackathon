@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 
@@ -50,6 +51,21 @@ func main() {
 		"Watsonx model ID (defaults to WATSONX_MODEL)",
 	)
 
+	includeTrajectoryDefault := false
+	if value := os.Getenv("INCLUDE_TRAJECTORY"); value != "" {
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			log.Fatalf("parse INCLUDE_TRAJECTORY: %v (use true or false)", err)
+		}
+		includeTrajectoryDefault = parsed
+	}
+
+	includeTrajectory := flag.Bool(
+		"include-trajectory",
+		includeTrajectoryDefault,
+		"include Watsonx agent trajectory in explain responses (defaults to INCLUDE_TRAJECTORY)",
+	)
+
 	flag.Parse()
 
 	var llmClient llm.Client
@@ -58,7 +74,7 @@ func main() {
 	projectID := os.Getenv("WATSONX_PROJECT_ID")
 
 	if apiKey != "" && projectID != "" && *model != "" {
-		client, err := llm.NewWatsonxClient(*model)
+		client, err := llm.NewWatsonxClient(*model, *root, *rgBinary)
 		if err != nil {
 			log.Fatalf("create Watsonx client: %v", err)
 		}
@@ -76,6 +92,7 @@ func main() {
 		*root,
 		*rgBinary,
 		llmClient,
+		*includeTrajectory,
 	)
 	if err != nil {
 		log.Fatalf("create service: %v", err)

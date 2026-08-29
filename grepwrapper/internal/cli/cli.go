@@ -47,6 +47,15 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		"number of lines after a match in context mode",
 	)
 
+	flags.Usage = func() {
+		fmt.Fprintln(stderr, usage)
+		flags.PrintDefaults()
+	}
+
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+
 	switch *sourceMode {
 	case "match", "context", "file":
 	default:
@@ -64,14 +73,6 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	flags.Usage = func() {
-		fmt.Fprintln(stderr, usage)
-		flags.PrintDefaults()
-	}
-
-	if err := flags.Parse(args); err != nil {
-		return 2
-	}
 	if flags.NArg() != 1 {
 		flags.Usage()
 		return 2
