@@ -5,6 +5,7 @@
 import type { FlowEdge, FlowNode, NodeDetail } from '@/types/flowGraph'
 import { computed, ref, watch } from 'vue'
 import { nodeDisplayTitle, useFlowMermaid } from '@/composables/useFlowMermaid'
+import { edgeOrder } from '@/utils/flowGraphUtils'
 
 const props = defineProps<{
   nodes: FlowNode[]
@@ -80,13 +81,6 @@ const orderedNodes = computed(() => {
   rest.sort((a, b) => (a.line ?? 0) - (b.line ?? 0))
   return [...ordered, ...rest]
 })
-
-function edgeOrder(label?: string): number {
-  if (label === 'true') return 0
-  if (label === 'then' || label === 'each' || label === 'start') return 1
-  if (label === 'false' || label === 'done') return 2
-  return 3
-}
 
 const selectedNode = computed(() => props.nodes.find((n) => n.id === props.selectedNodeId))
 const showExpandHint = computed(

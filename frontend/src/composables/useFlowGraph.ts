@@ -1,6 +1,5 @@
 import { ref } from 'vue'
 import type {
-  EnrichNodeInput,
   EnrichPatch,
   FlowEdge,
   FlowGraph,
@@ -8,17 +7,25 @@ import type {
   GraphExpandPayload,
   GraphRootPayload,
 } from '@/types/flowGraph'
+import { enrichSymbolNodes, fetchGraphRoot } from '@/utils/flowGraphEnrich'
+import {
+  ENRICHMENT_HORIZON_DEPTH,
+  enrichmentHorizon,
+  type SymbolFlowState,
+} from '@/utils/flowGraphUtils'
+import type { useFlowGraphCache } from '@/composables/useFlowGraphCache'
 
 /**
- * Manages scan-first flow graph with progressive step reveal and async LLM labels.
+ * Manages scan-first flow graph with cache, progressive reveal, and async LLM labels.
  */
-export function useFlowGraph() {
+export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
   const allNodes = ref<FlowNode[]>([])
   const allEdges = ref<FlowEdge[]>([])
   const nodes = ref<FlowNode[]>([])
   const edges = ref<FlowEdge[]>([])
   const revealedIds = ref<Set<string>>(new Set())
   const enrichedIds = ref<Set<string>>(new Set())
+  const inFlightIds = ref<Set<string>>(new Set())
   const rootId = ref('')
   const symbol = ref('')
   const loading = ref(false)
@@ -30,6 +37,35 @@ export function useFlowGraph() {
   const currentFilePath = ref('')
   const currentWorkspace = ref('')
   const lastPayload = ref<GraphRootPayload | null>(null)
+
+  function snapshotState(): SymbolFlowState {
+    return {
+      allNodes: allNodes.value.map((n) => ({ ...n })),
+      allEdges: [...allEdges.value],
+      rootId: rootId.value,
+      revealedIds: new Set(revealedIds.value),
+      enrichedIds: new Set(enrichedIds.value),
+      isMock: isMock.value,
+      parentPath: [...parentPath.value],
+    }
+  }
+
+  function persistToCache(): void {
+    if (!currentFilePath.value || !symbol.value) return
+    cache.set(currentFilePath.value, symbol.value, snapshotState())
+  }
+
+  function hydrateFromState(state: SymbolFlowState, sym: string): void {
+    allNodes.value = state.allNodes.map((n) => ({ ...n }))
+    allEdges.value = [...state.allEdges]
+    rootId.value = state.rootId
+    revealedIds.value = new Set(state.revealedIds)
+    enrichedIds.value = new Set(state.enrichedIds)
+    isMock.value = state.isMock
+    parentPath.value = [...state.parentPath]
+    symbol.value = sym
+    syncVisible()
+  }
 
   function syncVisible(): void {
     const revealed = revealedIds.value
@@ -46,44 +82,40 @@ export function useFlowGraph() {
       enrichedIds.value.add(patch.id)
     }
     syncVisible()
+    persistToCache()
   }
 
-  async function enrichNodes(nodeIds: string[]): Promise<void> {
+  async function enrichNodes(nodeIds: string[], opts?: { background?: boolean }): Promise<void> {
     const payload = lastPayload.value
     if (!payload || nodeIds.length === 0) return
 
-    const pending = nodeIds.filter((id) => !enrichedIds.value.has(id))
+    const pending = nodeIds.filter((id) => !enrichedIds.value.has(id) && !inFlightIds.value.has(id))
     if (pending.length === 0) return
 
-    enriching.value = true
+    if (!opts?.background) enriching.value = true
     try {
-      const byId = new Map(allNodes.value.map((n) => [n.id, n]))
-      const enrichNodes: EnrichNodeInput[] = pending.slice(0, 8).map((id) => {
-        const n = byId.get(id)!
-        return {
-          id: n.id,
-          line: n.line ?? 0,
-          code: n.code ?? n.summary,
-          kind: n.kind,
-        }
-      })
-      const res = await fetch('/api/graph/enrich', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workspacePath: payload.workspacePath,
-          filePath: payload.filePath,
-          symbol: payload.symbol,
-          nodes: enrichNodes,
-          userContext: payload.userContext,
-        }),
-      })
-      if (!res.ok) return
-      const data = (await res.json()) as { patches: EnrichPatch[] }
-      applyPatches(data.patches ?? [])
+      const state = snapshotState()
+      await enrichSymbolNodes(state, payload, pending, inFlightIds.value)
+      allNodes.value = state.allNodes
+      enrichedIds.value = state.enrichedIds
+      syncVisible()
+      persistToCache()
     } finally {
-      enriching.value = false
+      if (!opts?.background) enriching.value = false
     }
+  }
+
+  function prefetchAroundNode(nodeId: string): void {
+    const payload = lastPayload.value
+    if (!payload) return
+
+    const ids: string[] = []
+    if (!enrichedIds.value.has(nodeId)) ids.push(nodeId)
+    ids.push(
+      ...enrichmentHorizon(nodeId, allEdges.value, ENRICHMENT_HORIZON_DEPTH, enrichedIds.value),
+    )
+    const unique = [...new Set(ids)].filter((id) => !enrichedIds.value.has(id))
+    if (unique.length) void enrichNodes(unique, { background: true })
   }
 
   function hasHiddenChildren(nodeId: string): boolean {
@@ -103,7 +135,10 @@ export function useFlowGraph() {
     if (newly.length === 0) return []
     revealedIds.value = revealed
     syncVisible()
+    persistToCache()
     void enrichNodes(newly)
+    for (const id of newly) prefetchAroundNode(id)
+    prefetchAroundNode(nodeId)
     return newly
   }
 
@@ -129,9 +164,28 @@ export function useFlowGraph() {
       expanded.expandable = false
     }
     syncVisible()
+    persistToCache()
   }
 
-  async function loadRoot(payload: GraphRootPayload): Promise<void> {
+  function activateSymbol(sym: string, payload: GraphRootPayload): boolean {
+    const cached = cache.get(payload.filePath, sym)
+    if (!cached) return false
+    error.value = null
+    currentFilePath.value = payload.filePath
+    currentWorkspace.value = payload.workspacePath
+    lastPayload.value = { ...payload, symbol: sym }
+    hydrateFromState(cached, sym)
+    const frontier = [...revealedIds.value].at(-1) ?? rootId.value
+    if (frontier) prefetchAroundNode(frontier)
+    return true
+  }
+
+  async function loadRoot(payload: GraphRootPayload, opts?: { skipCache?: boolean }): Promise<void> {
+    if (!opts?.skipCache && cache.has(payload.filePath, payload.symbol)) {
+      activateSymbol(payload.symbol, payload)
+      return
+    }
+
     loading.value = true
     error.value = null
     parentPath.value = []
@@ -140,16 +194,11 @@ export function useFlowGraph() {
     symbol.value = payload.symbol
     lastPayload.value = payload
     enrichedIds.value = new Set()
+    inFlightIds.value = new Set()
     revealedIds.value = new Set()
 
     try {
-      const res = await fetch('/api/graph/root', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error(`Graph load failed (${res.status})`)
-      const data = (await res.json()) as FlowGraph
+      const data = await fetchGraphRoot(payload)
       allNodes.value = data.nodes
       allEdges.value = data.edges
       rootId.value = data.rootId
@@ -160,8 +209,10 @@ export function useFlowGraph() {
       }
       syncVisible()
       loading.value = false
+      persistToCache()
       if (data.rootId) {
         void enrichNodes([data.rootId])
+        prefetchAroundNode(data.rootId)
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load graph'
@@ -203,8 +254,10 @@ export function useFlowGraph() {
       }
       revealedIds.value = new Set(revealedIds.value)
       syncVisible()
+      persistToCache()
       if (newIds.length) {
         void enrichNodes(newIds)
+        for (const id of newIds) prefetchAroundNode(id)
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Expand failed'
@@ -220,6 +273,7 @@ export function useFlowGraph() {
     edges.value = []
     revealedIds.value = new Set()
     enrichedIds.value = new Set()
+    inFlightIds.value = new Set()
     rootId.value = ''
     symbol.value = ''
     error.value = null
@@ -241,9 +295,11 @@ export function useFlowGraph() {
     currentFilePath,
     currentWorkspace,
     loadRoot,
+    activateSymbol,
     expandNode,
     revealFromNode,
     hasHiddenChildren,
+    prefetchAroundNode,
     reset,
   }
 }

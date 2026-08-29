@@ -12,7 +12,8 @@
     "lint": "run-s \"lint:*\"",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
-    "format": "prettier --write --experimental-cli src/"
+    "format": "prettier --write --experimental-cli src/",
+    "test": "vitest run"
   },
   "dependencies": {
     "mermaid": "^11.6.0",
@@ -40,6 +41,7 @@
     "typescript": "~6.0.0",
     "vite": "^8.1.5",
     "vite-plugin-vue-devtools": "^8.1.5",
+    "vitest": "^3.2.7",
     "vue-eslint-parser": "^10.4.1",
     "vue-tsc": "^3.3.7"
   },

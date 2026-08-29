@@ -35,6 +35,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/health", h.Health)
 	mux.HandleFunc("/api/tree", h.Tree)
+	mux.HandleFunc("/api/file/symbols", h.FileSymbols)
 	mux.HandleFunc("/api/file", h.File)
 	mux.HandleFunc("/api/analyze", h.Analyze)
 	mux.HandleFunc("/api/graph/root", h.GraphRoot)

@@ -9,6 +9,7 @@ const props = defineProps<{
   workspacePath: string
   filePath: string
   activeSymbol: string
+  symbolNames?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -21,6 +22,10 @@ const loading = ref(false)
 async function load(): Promise<void> {
   if (!props.workspacePath || !props.filePath) {
     functions.value = []
+    return
+  }
+  if (props.symbolNames?.length) {
+    functions.value = props.symbolNames
     return
   }
   loading.value = true
@@ -36,7 +41,7 @@ async function load(): Promise<void> {
 }
 
 onMounted(load)
-watch(() => props.filePath, load)
+watch(() => [props.filePath, props.symbolNames] as const, load)
 </script>
 
 <template>
