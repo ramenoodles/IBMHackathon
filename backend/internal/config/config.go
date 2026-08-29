@@ -16,7 +16,7 @@ type Config struct {
 }
 
 func FromEnvironment() Config {
-	return Config{Host: env("HOST", ""), Port: env("PORT", "8080"), RGBinary: env("RG_BINARY", "rg"), WatsonxAPIKey: os.Getenv("WATSONX_API_KEY"), WatsonxProjectID: os.Getenv("WATSONX_PROJECT_ID"), WatsonxModel: os.Getenv("WATSONX_MODEL"), MaxBodyBytes: int64(envInt("MAX_BODY_BYTES", 200<<20))}
+	return Config{Host: env("HOST", "127.0.0.1"), Port: env("PORT", "8080"), RGBinary: env("RG_BINARY", "rg"), WatsonxAPIKey: os.Getenv("WATSONX_API_KEY"), WatsonxProjectID: os.Getenv("WATSONX_PROJECT_ID"), WatsonxModel: os.Getenv("WATSONX_MODEL"), MaxBodyBytes: int64(envInt("MAX_BODY_BYTES", 200<<20))}
 }
 
 func env(key, fallback string) string {
