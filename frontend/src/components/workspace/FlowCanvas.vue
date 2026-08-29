@@ -296,10 +296,6 @@ const showExpandHint = computed(
             >
               Show full flow
             </button>
-            <div class="flex items-center gap-3 text-[10px] text-slate-500">
-              <span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-sm border border-green-500 bg-green-900/40" /> structure</span>
-              <span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-sm border border-dashed border-amber-500 bg-amber-900/40" /> AI label</span>
-            </div>
           </div>
         </div>
 
