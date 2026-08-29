@@ -9,6 +9,7 @@ import { fetchTreeEntries, type TreeEntry } from '@/composables/useFileTree'
 const props = defineProps<{
   workspacePath: string
   selectedPath: string
+  width?: number
 }>()
 
 const emit = defineEmits<{
@@ -34,7 +35,10 @@ watch(() => props.workspacePath, loadRoot)
 </script>
 
 <template>
-  <aside class="flex h-full w-44 shrink-0 flex-col border-r border-slate-800 bg-slate-900">
+  <aside
+    class="flex h-full shrink-0 flex-col border-r border-slate-800 bg-slate-900"
+    :style="{ width: `${width ?? 176}px` }"
+  >
     <div class="flex items-center justify-between border-b border-slate-800 px-3 py-2">
       <span class="text-xs font-medium text-slate-400">Files</span>
       <button

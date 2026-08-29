@@ -22,7 +22,7 @@ func (b *Builder) BuildEnrich(ctx context.Context, input BuildInput, nodes []Enr
 	var pending []EnrichNodeInput
 
 	for _, n := range nodes {
-		key := EnrichKey(input.WorkspacePath, input.FilePath, n.Line)
+		key := EnrichKey(input.WorkspacePath, input.FilePath, n.ID, n.Line)
 		if title, summary, ok := b.enrich.Get(key); ok && summary != "" {
 			patches = append(patches, EnrichPatch{ID: n.ID, Title: title, Summary: summary})
 			continue
@@ -58,7 +58,7 @@ func (b *Builder) BuildEnrich(ctx context.Context, input BuildInput, nodes []Enr
 	for _, p := range generated {
 		for _, n := range pending {
 			if n.ID == p.ID {
-				key := EnrichKey(input.WorkspacePath, input.FilePath, n.Line)
+				key := EnrichKey(input.WorkspacePath, input.FilePath, n.ID, n.Line)
 				title := p.Title
 				if title == "" {
 					title, _ = fallbackDisplay(n)

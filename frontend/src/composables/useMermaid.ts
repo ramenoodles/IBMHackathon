@@ -12,6 +12,10 @@ function ensureMermaidInit(): void {
     startOnLoad: false,
     theme: 'dark',
     securityLevel: 'loose',
+    flowchart: {
+      useMaxWidth: false,
+      htmlLabels: true,
+    },
   })
   initialized = true
 }

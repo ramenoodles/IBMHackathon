@@ -1,10 +1,11 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/ibmhackathon/onbober/internal/graph"
 )
@@ -102,29 +103,139 @@ func (h *Handler) GraphNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	workspace := r.URL.Query().Get("workspace")
-	nodeID := r.URL.Query().Get("nodeId")
-	symbol := r.URL.Query().Get("symbol")
-	filePath := r.URL.Query().Get("file")
-	title := r.URL.Query().Get("title")
-	line, _ := strconv.Atoi(r.URL.Query().Get("line"))
-	confidence := graph.Confidence(r.URL.Query().Get("confidence"))
-
-	if workspace == "" || nodeID == "" {
+	params, ok := parseGraphNodeQuery(r)
+	if !ok {
 		http.Error(w, "workspace and nodeId are required", http.StatusBadRequest)
 		return
 	}
 
-	detail, err := h.graphs.BuildNodeDetail(context.Background(), graph.BuildInput{
-		WorkspacePath: workspace,
-		FilePath:      filePath,
-		Symbol:        symbol,
-		Experience:    r.URL.Query().Get("experience"),
-		Language:      r.URL.Query().Get("language"),
-	}, nodeID, title, line, confidence, r.URL.Query().Get("code"))
+	detail, err := h.graphs.BuildNodeDetail(r.Context(), graph.BuildInput{
+		WorkspacePath: params.Workspace,
+		FilePath:      params.FilePath,
+		Symbol:        params.Symbol,
+		Experience:    params.Experience,
+		Language:      params.Language,
+	}, params.NodeID, params.Title, params.Line, params.Confidence, params.Code, params.Kind, params.Summary)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeJSON(w, http.StatusOK, detail)
+}
+
+// GraphNodeStream streams a plain-text node explanation via SSE.
+func (h *Handler) GraphNodeStream(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	params, ok := parseGraphNodeQuery(r)
+	if !ok {
+		http.Error(w, "workspace and nodeId are required", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	input := graph.BuildInput{
+		WorkspacePath: params.Workspace,
+		FilePath:      params.FilePath,
+		Symbol:        params.Symbol,
+		Experience:    params.Experience,
+		Language:      params.Language,
+	}
+
+	meta, _ := json.Marshal(graph.NodeDetail{
+		ID:         params.NodeID,
+		Title:      params.Title,
+		Summary:    params.Summary,
+		Confidence: params.Confidence,
+		File:       params.FilePath,
+		Line:       params.Line,
+	})
+	if err := writeSSE(w, "meta", string(meta)); err != nil {
+		return
+	}
+
+	tokens, bundle, mock, err := h.graphs.StreamNodeDetailExplanation(r.Context(), input, params.NodeID, params.Code, params.Kind, params.Summary)
+	if err != nil || mock {
+		mockDetail := graph.MockNodeDetail(params.NodeID, params.Title, params.FilePath, params.Line)
+		final := h.graphs.FinalizeStreamedDetail(mockDetail.Explanation, params.Code, bundle)
+		final.ID = params.NodeID
+		final.Title = params.Title
+		final.Summary = params.Summary
+		final.Confidence = params.Confidence
+		final.File = params.FilePath
+		final.Line = params.Line
+		final.Mock = true
+		for _, ch := range final.Explanation {
+			payload := fmt.Sprintf(`{"content":%q,"mock":true}`, string(ch))
+			if err := writeSSE(w, "token", payload); err != nil {
+				return
+			}
+		}
+		done, _ := json.Marshal(final)
+		_ = writeSSE(w, "done", string(done))
+		return
+	}
+
+	var full strings.Builder
+	for token := range tokens {
+		full.WriteString(token)
+		payload := fmt.Sprintf(`{"content":%q}`, token)
+		if err := writeSSE(w, "token", payload); err != nil {
+			return
+		}
+	}
+
+	final := h.graphs.FinalizeStreamedDetail(full.String(), params.Code, bundle)
+	final.ID = params.NodeID
+	final.Title = params.Title
+	final.Summary = params.Summary
+	final.Confidence = params.Confidence
+	final.File = params.FilePath
+	final.Line = params.Line
+	done, _ := json.Marshal(final)
+	_ = writeSSE(w, "done", string(done))
+}
+
+type graphNodeQuery struct {
+	Workspace  string
+	NodeID     string
+	Symbol     string
+	FilePath   string
+	Title      string
+	Code       string
+	Kind       string
+	Summary    string
+	Experience string
+	Language   string
+	Line       int
+	Confidence graph.Confidence
+}
+
+func parseGraphNodeQuery(r *http.Request) (graphNodeQuery, bool) {
+	workspace := r.URL.Query().Get("workspace")
+	nodeID := r.URL.Query().Get("nodeId")
+	if workspace == "" || nodeID == "" {
+		return graphNodeQuery{}, false
+	}
+	line, _ := strconv.Atoi(r.URL.Query().Get("line"))
+	return graphNodeQuery{
+		Workspace:  workspace,
+		NodeID:     nodeID,
+		Symbol:     r.URL.Query().Get("symbol"),
+		FilePath:   r.URL.Query().Get("file"),
+		Title:      r.URL.Query().Get("title"),
+		Code:       r.URL.Query().Get("code"),
+		Kind:       r.URL.Query().Get("kind"),
+		Summary:    r.URL.Query().Get("summary"),
+		Experience: r.URL.Query().Get("experience"),
+		Language:   r.URL.Query().Get("language"),
+		Line:       line,
+		Confidence: graph.Confidence(r.URL.Query().Get("confidence")),
+	}, true
 }

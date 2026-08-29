@@ -11,7 +11,9 @@ import FlowWarmOverlay from '@/components/workspace/FlowWarmOverlay.vue'
 import BranchPrompt from '@/components/workspace/BranchPrompt.vue'
 import Modal from '@/components/ui/Modal.vue'
 import CodePanel from '@/components/workspace/CodePanel.vue'
+import ResizeHandle from '@/components/ui/ResizeHandle.vue'
 import { useWorkspaceLayout } from '@/composables/useWorkspaceLayout'
+import { useHorizontalResize } from '@/composables/usePanelResize'
 import { useFlowGraphCache } from '@/composables/useFlowGraphCache'
 import { useFlowGraph } from '@/composables/useFlowGraph'
 import { useSymbolBrief } from '@/composables/useSymbolBrief'
@@ -22,7 +24,26 @@ import type { FlowNode } from '@/types/flowGraph'
 
 type WorkspacePhase = 'idle' | 'brief' | 'warming' | 'tracing'
 
-const { sidebarOpen, isMobile, toggleSidebar } = useWorkspaceLayout()
+const {
+  sidebarOpen,
+  isMobile,
+  explorerWidth,
+  EXPLORER_MIN,
+  EXPLORER_MAX,
+  persistWidths,
+  toggleSidebar,
+} = useWorkspaceLayout()
+
+const resizeEnabled = computed(() => !isMobile.value)
+
+const { onPointerDown: onExplorerResize } = useHorizontalResize({
+  width: explorerWidth,
+  min: EXPLORER_MIN,
+  max: EXPLORER_MAX,
+  side: 'right',
+  enabled: resizeEnabled,
+  onEnd: persistWidths,
+})
 
 const graphCache = useFlowGraphCache()
 const {
@@ -49,7 +70,7 @@ const {
 const { symbols, loading: symbolsLoading, error: symbolsError, isLargeFile, load: loadSymbols, reset: resetSymbols } =
   useSymbolBrief()
 const { warming, progress, warmFile } = useFileFlowWarm(graphCache)
-const { detail, loading: detailLoading, loadDetail } = useNodeDetail()
+const { detail, loading: detailLoading, streaming: detailStreaming, error: detailError, loadDetail, clear: clearDetail } = useNodeDetail()
 
 const workspacePhase = ref<WorkspacePhase>('idle')
 const selectedPath = ref('')
@@ -86,6 +107,7 @@ async function onSelectFile(path: string): Promise<void> {
   selectedPath.value = path
   symbol.value = ''
   selectedNodeId.value = ''
+  clearDetail()
   warmedSymbolNames.value = []
   resetGraph()
 
@@ -132,6 +154,7 @@ async function onPickSymbol(name: string): Promise<void> {
   if (!selectedPath.value) return
   symbol.value = name
   selectedNodeId.value = ''
+  clearDetail()
   const payload = { ...graphPayload(), symbol: name }
   if (!activateSymbol(name, payload)) {
     await loadRoot(payload)
@@ -145,18 +168,26 @@ function onRevealNode(node: FlowNode): void {
 function onSelectNode(node: FlowNode): void {
   selectedNodeId.value = node.id
   prefetchAroundNode(node.id)
-  void loadDetail({
-    workspace: userContext.value.workspacePath,
-    nodeId: node.id,
-    symbol: symbol.value,
-    file: node.file ?? selectedPath.value,
-    line: node.line,
-    title: node.title ?? node.label,
-    confidence: node.confidence,
-    code: node.code,
-    experience: userContext.value.experienceLevel,
-    language: userContext.value.primaryLanguage,
-  })
+}
+
+function onRequestDetail(node: FlowNode): void {
+  void loadDetail(
+    {
+      workspace: userContext.value.workspacePath,
+      nodeId: node.id,
+      symbol: symbol.value,
+      file: node.file ?? selectedPath.value,
+      line: node.line,
+      title: node.title ?? node.label,
+      confidence: node.confidence,
+      code: node.code,
+      kind: node.kind,
+      summary: node.summary,
+      experience: userContext.value.experienceLevel,
+      language: userContext.value.primaryLanguage,
+    },
+    { stream: true },
+  )
 }
 
 function onViewSource(file?: string): void {
@@ -229,8 +260,15 @@ function fileName(): string {
         v-show="sidebarOpen"
         :workspace-path="userContext.workspacePath"
         :selected-path="selectedPath"
+        :width="explorerWidth"
         @select="onSelectFile"
         @toggle="toggleSidebar"
+      />
+
+      <ResizeHandle
+        v-if="sidebarOpen && !isMobile"
+        label="Resize file explorer"
+        @pointerdown="onExplorerResize"
       />
 
       <div class="relative flex min-w-0 flex-1 flex-col">
@@ -270,8 +308,11 @@ function fileName(): string {
           :selected-node-id="selectedNodeId"
           :detail="detail"
           :detail-loading="detailLoading"
+          :detail-streaming="detailStreaming"
+          :detail-error="detailError"
           :has-hidden-children="hasHiddenChildren"
           @select-node="onSelectNode"
+          @request-detail="onRequestDetail"
           @reveal-node="onRevealNode"
           @expand-node="onExpandNode"
           @show-full-flow="onShowFullFlow"

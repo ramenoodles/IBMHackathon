@@ -24,6 +24,8 @@ const MERMAID_RESERVED = new Set([
   'default',
 ])
 
+const STRUCTURAL_RENDER_DEBOUNCE_MS = 75
+
 /**
  * Escape text for Mermaid quoted node labels.
  * @param text - Raw label text.
@@ -77,15 +79,9 @@ function looksLikeCode(text: string): boolean {
 
 /**
  * Compile flow graph nodes and edges into Mermaid flowchart syntax.
- * @param nodes - Graph nodes.
- * @param edges - Graph edges.
- * @param selectedNodeId - Currently selected node for highlight.
+ * Selection highlighting is applied via DOM after render — not in DSL.
  */
-export function compileToMermaid(
-  nodes: FlowNode[],
-  edges: FlowEdge[],
-  selectedNodeId = '',
-): string {
+export function compileToMermaid(nodes: FlowNode[], edges: FlowEdge[]): string {
   if (nodes.length === 0) return ''
 
   const indexById = new Map(nodes.map((n, i) => [n.id, i]))
@@ -95,7 +91,6 @@ export function compileToMermaid(
     'classDef verified fill:#1a2e1a,stroke:#4ade80,color:#e2e8f0',
     'classDef inferred fill:#2a1f0a,stroke:#fbbf24,color:#e2e8f0,stroke-dasharray:5 5',
     'classDef collapsed fill:#1e293b,stroke:#ff3366,color:#f8fafc',
-    'classDef selected fill:#3b0d1a,stroke:#ff3366,color:#fff,stroke-width:3px',
   ]
 
   for (let i = 0; i < nodes.length; i++) {
@@ -110,13 +105,8 @@ export function compileToMermaid(
       lines.push(`  ${mid}["${safe}"]`)
     }
 
-    const classes: string[] = []
-    if (selectedNodeId === node.id) {
-      classes.push('selected')
-    } else {
-      classes.push(node.confidence)
-      if (node.collapsed) classes.push('collapsed')
-    }
+    const classes: string[] = [node.confidence]
+    if (node.collapsed) classes.push('collapsed')
     lines.push(`  class ${mid} ${classes.join(',')}`)
   }
 
@@ -135,6 +125,37 @@ export function compileToMermaid(
   }
 
   return lines.join('\n')
+}
+
+function findNodeGroup(container: HTMLElement, nodes: FlowNode[], nodeId: string): SVGGElement | null {
+  const idx = nodes.findIndex((n) => n.id === nodeId)
+  if (idx >= 0) {
+    const byIdx = container.querySelector(`g[id^="flowchart-n${idx}-"]`)
+    if (byIdx) return byIdx as SVGGElement
+  }
+  const legacy = nodes.find((n) => n.id === nodeId)
+  if (!legacy) return null
+  for (const g of container.querySelectorAll('g.node')) {
+    if (g.id.includes(mermaidId(legacy.id))) return g as SVGGElement
+  }
+  return null
+}
+
+/**
+ * Highlight the selected node in the rendered SVG without re-rendering Mermaid.
+ */
+export function applySelectionHighlight(
+  container: HTMLElement | null,
+  nodes: FlowNode[],
+  selectedNodeId: string,
+): void {
+  if (!container) return
+  for (const g of container.querySelectorAll('g.node.is-selected')) {
+    g.classList.remove('is-selected')
+  }
+  if (!selectedNodeId) return
+  const group = findNodeGroup(container, nodes, selectedNodeId)
+  group?.classList.add('is-selected')
 }
 
 /**
@@ -176,38 +197,57 @@ export function useFlowMermaid(
   edges: MaybeRefOrGetter<FlowEdge[]>,
   selectedNodeId: MaybeRefOrGetter<string> = '',
   onNodeClick?: (node: FlowNode) => void,
+  onStructuralRender?: () => void,
 ) {
   const mermaidCode = ref('')
   const renderError = ref<string | null>(null)
   const containerRef = ref<HTMLElement | null>(null)
+  let structuralTimer: ReturnType<typeof setTimeout> | null = null
 
-  async function render(): Promise<void> {
+  async function renderStructural(): Promise<void> {
     const nodeList = toValue(nodes)
     const edgeList = toValue(edges)
-    const selected = toValue(selectedNodeId)
-    mermaidCode.value = compileToMermaid(nodeList, edgeList, selected)
+    mermaidCode.value = compileToMermaid(nodeList, edgeList)
     if (!containerRef.value || !mermaidCode.value) return
     try {
       renderError.value = null
       await renderMermaid(containerRef.value, mermaidCode.value)
       if (onNodeClick) attachNodeClicks(containerRef.value, nodeList, onNodeClick)
+      applySelectionHighlight(containerRef.value, nodeList, toValue(selectedNodeId))
+      onStructuralRender?.()
     } catch (err) {
       renderError.value = err instanceof Error ? err.message : 'Render failed'
     }
   }
 
+  function scheduleStructuralRender(): void {
+    if (structuralTimer) clearTimeout(structuralTimer)
+    structuralTimer = setTimeout(() => {
+      structuralTimer = null
+      void renderStructural()
+    }, STRUCTURAL_RENDER_DEBOUNCE_MS)
+  }
+
   watch(
-    [() => toValue(nodes), () => toValue(edges), () => toValue(selectedNodeId)],
+    [() => toValue(nodes), () => toValue(edges)],
     () => {
-      void render()
+      scheduleStructuralRender()
     },
     { deep: true },
   )
 
+  watch(
+    () => toValue(selectedNodeId),
+    (id) => {
+      const nodeList = toValue(nodes)
+      applySelectionHighlight(containerRef.value, nodeList, id)
+    },
+  )
+
   function setContainer(el: HTMLElement | null): void {
     containerRef.value = el
-    void render()
+    void renderStructural()
   }
 
-  return { mermaidCode, renderError, setContainer }
+  return { mermaidCode, renderError, setContainer, renderStructural }
 }

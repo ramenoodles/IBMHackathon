@@ -20,7 +20,7 @@ import (
 func main() {
 	port := envOrDefault("PORT", "8080")
 	ollamaURL := envOrDefault("OLLAMA_URL", "http://localhost:11434")
-	ollamaModel := envOrDefault("OLLAMA_MODEL", "llama3.2")
+	ollamaModel := envOrDefault("OLLAMA_MODEL", "qwen2.5:7b")
 
 	llmClient := llm.NewOllamaClient(ollamaURL, ollamaModel)
 
@@ -42,6 +42,7 @@ func main() {
 	mux.HandleFunc("/api/graph/expand", h.GraphExpand)
 	mux.HandleFunc("/api/graph/enrich", h.GraphEnrich)
 	mux.HandleFunc("/api/graph/node", h.GraphNode)
+	mux.HandleFunc("/api/graph/node/stream", h.GraphNodeStream)
 	mux.HandleFunc("/api/workspace/setup", h.WorkspaceSetup)
 	mux.HandleFunc("/api/workspace/upload", h.WorkspaceUpload)
 

@@ -53,15 +53,18 @@ type FlowGraph struct {
 
 // NodeDetail holds expanded explanation for a selected node.
 type NodeDetail struct {
-	ID             string     `json:"id"`
-	Title          string     `json:"title"`
-	Summary        string     `json:"summary"`
-	Explanation    string     `json:"explanation"`
-	Confidence     Confidence `json:"confidence"`
-	File           string     `json:"file,omitempty"`
-	Line           int        `json:"line,omitempty"`
-	RelatedSymbols []string   `json:"relatedSymbols,omitempty"`
-	Mock           bool       `json:"mock,omitempty"`
+	ID                  string     `json:"id"`
+	Title               string     `json:"title"`
+	Summary             string     `json:"summary"`
+	Explanation         string     `json:"explanation"`
+	VerifiedExplanation string     `json:"verifiedExplanation,omitempty"`
+	InferredExplanation string     `json:"inferredExplanation,omitempty"`
+	Evidence            []string   `json:"evidence,omitempty"`
+	Confidence          Confidence `json:"confidence"`
+	File                string     `json:"file,omitempty"`
+	Line                int        `json:"line,omitempty"`
+	RelatedSymbols      []string   `json:"relatedSymbols,omitempty"`
+	Mock                bool       `json:"mock,omitempty"`
 }
 
 // BuildInput carries context for graph construction.

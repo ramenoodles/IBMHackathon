@@ -65,6 +65,9 @@ export interface NodeDetail {
   title: string
   summary: string
   explanation: string
+  verifiedExplanation?: string
+  inferredExplanation?: string
+  evidence?: string[]
   confidence: FlowConfidence
   file?: string
   line?: number

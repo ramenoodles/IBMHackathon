@@ -154,24 +154,30 @@ func (b *Builder) buildScanGraph(input BuildInput) FlowGraph {
 }
 
 // BuildNodeDetail returns an expanded explanation for a node.
-func (b *Builder) BuildNodeDetail(ctx context.Context, input BuildInput, nodeID, title string, line int, confidence Confidence, code string) (NodeDetail, error) {
-	snippet := code
-	if snippet == "" {
-		snippet, _, _, _, _ = b.gatherContext(input)
-	}
+func (b *Builder) BuildNodeDetail(ctx context.Context, input BuildInput, nodeID, title string, line int, confidence Confidence, code, kind, enrichSummary string) (NodeDetail, error) {
+	bundle, payload := b.deepDivePayload(ctx, input, nodeID, code, kind, enrichSummary)
 	raw, err := b.llm.GenerateNodeDetail(ctx, llm.UserContext{
 		PrimaryLanguage: input.Language,
 		ExperienceLevel: input.Experience,
-	}, nodeID, input.Symbol, snippet)
+	}, input.Symbol, payload)
 	if err != nil {
 		d := MockNodeDetail(nodeID, title, input.FilePath, line)
+		applyDeepDiveSections(&d, fallbackDeepDiveExplanation(code), bundle)
+		d.Evidence = bundle.Evidence
 		return d, nil
 	}
 	d, err := ParseNodeDetail(raw)
-	if err != nil {
+	if err != nil || !ValidateNodeDetail(d) {
 		d = MockNodeDetail(nodeID, title, input.FilePath, line)
+		applyDeepDiveSections(&d, fallbackDeepDiveExplanation(code), bundle)
+		d.Evidence = bundle.Evidence
 		return d, nil
 	}
+	text := SanitizeDeepDiveText(d.Explanation)
+	if ok, _ := ValidateDeepDiveText(text); !ok {
+		text = fallbackDeepDiveExplanation(code)
+	}
+	applyDeepDiveSections(&d, text, bundle)
 	if d.Confidence == "" {
 		d.Confidence = confidence
 	}
@@ -181,7 +187,46 @@ func (b *Builder) BuildNodeDetail(ctx context.Context, input BuildInput, nodeID,
 	if d.Line == 0 {
 		d.Line = line
 	}
+	if d.Title == "" {
+		d.Title = title
+	}
 	return d, nil
+}
+
+// StreamNodeDetailExplanation streams a plain-text explanation for a node.
+func (b *Builder) StreamNodeDetailExplanation(ctx context.Context, input BuildInput, nodeID, code, kind, enrichSummary string) (<-chan string, DeepDiveBundle, bool, error) {
+	bundle, payload := b.deepDivePayload(ctx, input, nodeID, code, kind, enrichSummary)
+	tokens, mock, err := b.llm.StreamNodeDetailExplanation(ctx, llm.UserContext{
+		PrimaryLanguage: input.Language,
+		ExperienceLevel: input.Experience,
+	}, input.Symbol, payload)
+	return tokens, bundle, mock, err
+}
+
+// FinalizeStreamedDetail validates streamed text and populates NodeDetail sections.
+func (b *Builder) FinalizeStreamedDetail(text, code string, bundle DeepDiveBundle) NodeDetail {
+	d := NodeDetail{}
+	text = SanitizeDeepDiveText(text)
+	if ok, _ := ValidateDeepDiveText(text); !ok || strings.TrimSpace(text) == "" {
+		text = fallbackDeepDiveExplanation(code)
+	}
+	applyDeepDiveSections(&d, text, bundle)
+	return d
+}
+
+func (b *Builder) deepDivePayload(ctx context.Context, input BuildInput, nodeID, code, kind, enrichSummary string) (DeepDiveBundle, string) {
+	g, err := b.BuildRoot(ctx, input)
+	if err != nil {
+		bundle := DeepDiveBundle{Symbol: input.Symbol, StepCode: code, StepKind: kind, EnrichSummary: enrichSummary}
+		return bundle, bundle.Format()
+	}
+	bundle := b.buildDeepDiveBundle(input, g, nodeID, code, kind, enrichSummary)
+	return bundle, bundle.Format()
+}
+
+func (b *Builder) nodeDetailPayload(ctx context.Context, input BuildInput, nodeID, code, kind, enrichSummary string) string {
+	_, payload := b.deepDivePayload(ctx, input, nodeID, code, kind, enrichSummary)
+	return payload
 }
 
 func (b *Builder) gatherContext(input BuildInput) (snippet, lang string, callees []scanner.CalleeRef, branches []scanner.BranchRef, matches []scanner.Match) {

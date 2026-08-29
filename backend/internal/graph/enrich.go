@@ -43,8 +43,8 @@ func (c *EnrichCache) Set(key, title, summary string) {
 }
 
 // EnrichKey builds a cache key for a node summary.
-func EnrichKey(workspace, file string, line int) string {
-	return workspace + "|" + file + "|" + strconv.Itoa(line)
+func EnrichKey(workspace, file, nodeID string, line int) string {
+	return workspace + "|" + file + "|" + nodeID + "|" + strconv.Itoa(line)
 }
 
 // EnrichNodeInput is a node sent for LLM summary enrichment.

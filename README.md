@@ -16,7 +16,7 @@ IBMHackathon/
 - **Go** 1.22+
 - **ripgrep** (`rg`) on PATH
 - **git** on PATH (for GitHub clone option)
-- **Ollama** running locally with a model pulled (e.g. `ollama pull llama3.2`)
+- **Ollama** running locally with a model pulled (e.g. `ollama pull qwen2.5:7b`)
 
 ## Environment Variables
 
@@ -24,19 +24,26 @@ IBMHackathon/
 |----------|---------|-------------|
 | `PORT` | `8080` | Backend API port |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama base URL |
-| `OLLAMA_MODEL` | `llama3.2` | Model name for graph generation |
+| `OLLAMA_MODEL` | `qwen2.5:7b` | Model name for graph generation and deep dive |
 | `ONBOBER_WORKSPACE_ROOT` | `%TEMP%/onbober-workspaces` | Storage for cloned/uploaded repos |
 
 ## Development
 
+**→ Full setup and run instructions: [docs/STARTUP.md](docs/STARTUP.md)**
+
+Quick start:
+
 ```bash
+# One-time
+ollama pull qwen2.5:7b
+cd frontend && npm install && cd ..
+
 # Terminal 1 — Backend
 cd backend
 go run ./cmd/api
 
 # Terminal 2 — Frontend
 cd frontend
-npm install
 npm run dev
 ```
 

@@ -3,17 +3,48 @@
  * Flow graph canvas: progressive reveal + Mermaid flowchart + execution trace.
  */
 import type { FlowEdge, FlowNode, NodeDetail } from '@/types/flowGraph'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { nodeDisplayTitle, useFlowMermaid } from '@/composables/useFlowMermaid'
+import { useFlowPanZoom } from '@/composables/useFlowPanZoom'
+import { useHorizontalResize } from '@/composables/usePanelResize'
 import { useWorkspaceLayout } from '@/composables/useWorkspaceLayout'
+import ResizeHandle from '@/components/ui/ResizeHandle.vue'
 import { edgeOrder } from '@/utils/flowGraphUtils'
 
 const {
   tracePanelOpen,
   detailPanelOpen,
+  isMobile,
+  traceWidth,
+  detailWidth,
+  TRACE_MIN,
+  TRACE_MAX,
+  DETAIL_MIN,
+  DETAIL_MAX,
+  persistWidths,
   toggleTracePanel,
   toggleDetailPanel,
 } = useWorkspaceLayout()
+
+const resizeEnabled = computed(() => !isMobile.value)
+
+const { onPointerDown: onTraceResize } = useHorizontalResize({
+  width: traceWidth,
+  min: TRACE_MIN,
+  max: TRACE_MAX,
+  side: 'right',
+  enabled: resizeEnabled,
+  onEnd: persistWidths,
+})
+
+const { onPointerDown: onDetailResize } = useHorizontalResize({
+  width: detailWidth,
+  min: DETAIL_MIN,
+  max: DETAIL_MAX,
+  side: 'left',
+  enabled: resizeEnabled,
+  onEnd: persistWidths,
+})
 
 const props = defineProps<{
   nodes: FlowNode[]
@@ -30,6 +61,8 @@ const props = defineProps<{
   selectedNodeId: string
   detail: NodeDetail | null
   detailLoading: boolean
+  detailStreaming: boolean
+  detailError: string | null
   hasHiddenChildren: (nodeId: string) => boolean
 }>()
 
@@ -38,11 +71,21 @@ const emit = defineEmits<{
   expandNode: [node: FlowNode]
   revealNode: [node: FlowNode]
   showFullFlow: []
+  requestDetail: [node: FlowNode]
   viewSource: []
   goToDefinition: [file: string, line: number]
 }>()
 
 const mermaidContainer = ref<HTMLElement | null>(null)
+const panViewport = ref<HTMLElement | null>(null)
+const panContent = ref<HTMLElement | null>(null)
+const deepDiveOpen = ref(false)
+const evidenceOpen = ref(false)
+
+const { bind: bindPanZoom, unbind: unbindPanZoom, zoomIn, zoomOut, fitToView } = useFlowPanZoom(
+  panViewport,
+  panContent,
+)
 
 function onNodeClick(node: FlowNode): void {
   if (!props.fullyExpanded && node.collapsed && node.expandable) {
@@ -60,9 +103,36 @@ const { renderError, setContainer } = useFlowMermaid(
   () => props.edges,
   () => props.selectedNodeId,
   onNodeClick,
+  () => {
+    void nextTick(() => {
+      bindPanZoom()
+      fitToView()
+    })
+  },
 )
 
 watch(mermaidContainer, (el) => setContainer(el))
+
+watch(
+  () => props.selectedNodeId,
+  () => {
+    deepDiveOpen.value = false
+    evidenceOpen.value = false
+  },
+)
+
+watch(
+  () => props.mappingFullFlow,
+  (mapping) => {
+    if (!mapping) {
+      void nextTick(() => fitToView())
+    }
+  },
+)
+
+watch(panViewport, (el, prev) => {
+  if (!el && prev) unbindPanZoom()
+})
 
 const orderedNodes = computed(() => {
   if (!props.nodes.length) return []
@@ -94,9 +164,35 @@ const orderedNodes = computed(() => {
 })
 
 const selectedNode = computed(() => props.nodes.find((n) => n.id === props.selectedNodeId))
-const hasDetailContent = computed(
-  () => Boolean(props.selectedNodeId && (props.detail || props.detailLoading || selectedNode.value)),
+const hasDetailContent = computed(() => Boolean(props.selectedNodeId && selectedNode.value))
+const showAiSummary = computed(() => {
+  const node = selectedNode.value
+  if (!node?.summary?.trim()) return false
+  const title = nodeDisplayTitle(node)
+  return node.summary.trim() !== title
+})
+
+const verifiedExplanation = computed(
+  () => props.detail?.verifiedExplanation?.trim() || '',
 )
+const inferredExplanation = computed(
+  () => props.detail?.inferredExplanation?.trim() || '',
+)
+const hasEvidence = computed(() => (props.detail?.evidence?.length ?? 0) > 0)
+
+function kindLabel(kind: string): string {
+  const labels: Record<string, string> = {
+    entry: 'entry', call: 'call', branch: 'branch', return: 'return', assign: 'assign', loop: 'loop',
+  }
+  return labels[kind] ?? kind
+}
+
+function openDeepDive(): void {
+  if (!selectedNode.value) return
+  deepDiveOpen.value = true
+  emit('requestDetail', selectedNode.value)
+}
+
 const showExpandHint = computed(
   () =>
     !props.fullyExpanded &&
@@ -105,13 +201,6 @@ const showExpandHint = computed(
     props.rootId &&
     props.hasHiddenChildren(props.rootId),
 )
-
-function kindLabel(kind: string): string {
-  const labels: Record<string, string> = {
-    entry: 'entry', call: 'call', branch: 'branch', return: 'return', assign: 'assign', loop: 'loop',
-  }
-  return labels[kind] ?? kind
-}
 </script>
 
 <template>
@@ -173,6 +262,32 @@ function kindLabel(kind: string): string {
                 Details
               </button>
             </div>
+            <div class="flex items-center gap-0.5 rounded-md border border-slate-700 p-0.5">
+              <button
+                type="button"
+                class="rounded px-1.5 py-0.5 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-white"
+                title="Zoom out"
+                @click="zoomOut"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                class="rounded px-1.5 py-0.5 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-white"
+                title="Fit to view"
+                @click="fitToView"
+              >
+                Fit
+              </button>
+              <button
+                type="button"
+                class="rounded px-1.5 py-0.5 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-white"
+                title="Zoom in"
+                @click="zoomIn"
+              >
+                +
+              </button>
+            </div>
             <button
               v-if="!fullyExpanded && !mappingFullFlow"
               type="button"
@@ -209,7 +324,8 @@ function kindLabel(kind: string): string {
 
           <div
             v-else
-            class="flex w-72 shrink-0 flex-col border-r border-slate-800 bg-slate-900/40"
+            class="flex shrink-0 flex-col border-r border-slate-800 bg-slate-900/40"
+            :style="{ width: `${traceWidth}px` }"
           >
             <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-2 py-1.5">
               <span class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Steps</span>
@@ -224,64 +340,84 @@ function kindLabel(kind: string): string {
               </button>
             </div>
             <ol class="min-h-0 flex-1 overflow-y-auto p-2">
-            <li v-for="(node, i) in orderedNodes" :key="node.id" class="mb-1">
-              <button
-                type="button"
-                class="w-full rounded-md border px-2 py-1.5 text-left transition"
-                :class="
-                  selectedNodeId === node.id
-                    ? 'border-onbober-primary/50 bg-onbober-primary/5'
-                    : 'border-transparent hover:border-slate-700 hover:bg-slate-800/50'
-                "
-                @click="onNodeClick(node)"
-              >
-                <div class="flex items-center gap-2">
-                  <span
-                    class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
-                    :class="
-                      selectedNodeId === node.id
-                        ? 'bg-onbober-primary text-white'
-                        : 'bg-slate-800 text-slate-400'
-                    "
-                  >
-                    {{ i + 1 }}
-                  </span>
-                  <span class="min-w-0 flex-1 truncate text-xs font-medium text-slate-200">
-                    {{ nodeDisplayTitle(node) }}
-                  </span>
-                  <span
-                    v-if="hasHiddenChildren(node.id)"
-                    class="shrink-0 rounded bg-onbober-primary/20 px-1 text-[9px] font-bold uppercase text-onbober-primary"
-                  >
-                    +
-                  </span>
-                  <span class="shrink-0 text-[10px] uppercase text-slate-600">{{ kindLabel(node.kind) }}</span>
-                </div>
-                <p v-if="node.summary && node.summary !== nodeDisplayTitle(node)" class="mt-1 text-xs text-slate-400">
-                  {{ node.summary }}
-                </p>
-                <p v-if="node.code" class="mt-0.5 truncate font-mono text-[10px] text-slate-600">{{ node.code }}</p>
-              </button>
-            </li>
-          </ol>
+              <li v-for="(node, i) in orderedNodes" :key="node.id" class="mb-1">
+                <button
+                  type="button"
+                  class="w-full rounded-md border px-2 py-1.5 text-left transition"
+                  :class="
+                    selectedNodeId === node.id
+                      ? 'border-onbober-primary/50 bg-onbober-primary/5'
+                      : 'border-transparent hover:border-slate-700 hover:bg-slate-800/50'
+                  "
+                  @click="onNodeClick(node)"
+                >
+                  <div class="flex items-center gap-2">
+                    <span
+                      class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                      :class="
+                        selectedNodeId === node.id
+                          ? 'bg-onbober-primary text-white'
+                          : 'bg-slate-800 text-slate-400'
+                      "
+                    >
+                      {{ i + 1 }}
+                    </span>
+                    <span class="min-w-0 flex-1 truncate text-xs font-medium text-slate-200">
+                      {{ nodeDisplayTitle(node) }}
+                    </span>
+                    <span
+                      v-if="hasHiddenChildren(node.id)"
+                      class="shrink-0 rounded bg-onbober-primary/20 px-1 text-[9px] font-bold uppercase text-onbober-primary"
+                    >
+                      +
+                    </span>
+                    <span class="shrink-0 text-[10px] uppercase text-slate-600">{{ kindLabel(node.kind) }}</span>
+                  </div>
+                  <p v-if="node.summary && node.summary !== nodeDisplayTitle(node)" class="mt-1 text-xs text-slate-400">
+                    {{ node.summary }}
+                  </p>
+                  <p v-if="node.code" class="mt-0.5 truncate font-mono text-[10px] text-slate-600">{{ node.code }}</p>
+                </button>
+              </li>
+            </ol>
           </div>
 
-          <div class="relative min-w-0 flex-1 overflow-auto bg-slate-950/50 p-4">
+          <ResizeHandle
+            v-if="tracePanelOpen && !isMobile"
+            label="Resize steps panel"
+            @pointerdown="onTraceResize"
+          />
+
+          <div
+            ref="panViewport"
+            class="relative min-w-0 flex-1 overflow-hidden bg-slate-950/50"
+            title="Drag background to pan, scroll to zoom"
+          >
             <div
               v-if="mappingFullFlow"
               class="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm"
             >
               <p class="text-sm text-slate-300">Mapping full flow for {{ symbol }}...</p>
             </div>
-            <div
-              ref="mermaidContainer"
-              class="mermaid-flow mx-auto flex min-h-[180px] min-w-fit items-center justify-center"
-            />
-            <p v-if="renderError" class="mt-2 text-center text-xs text-red-400">{{ renderError }}</p>
+            <div ref="panContent" class="inline-block min-h-full min-w-full p-4">
+              <div
+                ref="mermaidContainer"
+                class="mermaid-flow mx-auto flex min-h-[180px] min-w-fit items-center justify-center"
+              />
+            </div>
+            <p v-if="renderError" class="pointer-events-none absolute bottom-2 left-0 right-0 text-center text-xs text-red-400">
+              {{ renderError }}
+            </p>
           </div>
         </div>
       </template>
     </div>
+
+    <ResizeHandle
+      v-if="hasDetailContent && detailPanelOpen && !isMobile"
+      label="Resize details panel"
+      @pointerdown="onDetailResize"
+    />
 
     <button
       v-if="hasDetailContent && !detailPanelOpen"
@@ -297,7 +433,8 @@ function kindLabel(kind: string): string {
 
     <aside
       v-else-if="hasDetailContent && detailPanelOpen"
-      class="flex w-72 shrink-0 flex-col border-l border-slate-800 bg-slate-900"
+      class="flex shrink-0 flex-col border-l border-slate-800 bg-slate-900"
+      :style="{ width: `${detailWidth}px` }"
     >
       <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-3 py-2">
         <span class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Details</span>
@@ -311,28 +448,104 @@ function kindLabel(kind: string): string {
           ›
         </button>
       </div>
-      <div class="min-h-0 flex-1 overflow-y-auto p-4">
-      <p v-if="detailLoading" class="text-sm text-slate-500">Loading...</p>
-      <template v-else>
-        <h3 class="font-semibold text-white">{{ selectedNode ? nodeDisplayTitle(selectedNode) : detail?.title }}</h3>
-        <span class="mt-1 inline-block rounded bg-green-900/40 px-1.5 py-0.5 text-[10px] font-bold uppercase text-green-400">
-          verified structure
-        </span>
-        <p v-if="selectedNode?.summary" class="mt-2 text-sm leading-relaxed text-amber-300/90">{{ selectedNode.summary }}</p>
-        <pre
-          v-if="selectedNode?.code"
-          class="mt-3 overflow-x-auto rounded border border-slate-800 bg-slate-950 p-2 font-mono text-[11px] leading-relaxed text-slate-300"
-        >{{ selectedNode.code }}</pre>
-        <p v-if="detail" class="mt-3 text-sm leading-relaxed text-slate-300">{{ detail.explanation }}</p>
+      <div v-if="selectedNode" class="min-h-0 flex-1 overflow-y-auto p-4">
+        <h3 class="font-semibold text-white">{{ nodeDisplayTitle(selectedNode) }}</h3>
+
+        <section class="mt-3">
+          <span class="inline-block rounded bg-green-900/40 px-1.5 py-0.5 text-[10px] font-bold uppercase text-green-400">
+            verified structure
+          </span>
+          <span class="ml-1 inline-block rounded border border-slate-700 px-1.5 py-0.5 text-[10px] uppercase text-slate-400">
+            {{ selectedNode.kind }}
+          </span>
+          <pre
+            v-if="selectedNode.code"
+            class="mt-2 overflow-x-auto rounded border border-slate-800 bg-slate-950 p-2 font-mono text-[11px] leading-relaxed text-slate-300"
+          >{{ selectedNode.code }}</pre>
+          <p v-else class="mt-2 text-xs text-slate-500">No source snippet for this step.</p>
+        </section>
+
+        <section v-if="showAiSummary" class="mt-4">
+          <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-400">
+            AI label
+          </span>
+          <p class="mt-2 text-sm leading-relaxed text-amber-300/90">{{ selectedNode.summary }}</p>
+        </section>
+
+        <section class="mt-4">
+          <button
+            v-if="!deepDiveOpen"
+            type="button"
+            class="w-full rounded-md border border-slate-700 px-3 py-2 text-left text-xs text-slate-300 transition hover:border-onbober-primary/50 hover:text-white"
+            @click="openDeepDive"
+          >
+            Explain this step
+          </button>
+          <template v-else>
+            <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-400">
+              Deep dive
+            </span>
+            <p v-if="detailLoading && !detail?.explanation && !verifiedExplanation" class="mt-2 text-sm text-slate-500">
+              Generating explanation...
+            </p>
+            <p v-if="detailError" class="mt-2 text-sm text-red-400">{{ detailError }}</p>
+            <p v-if="detail?.mock" class="mt-2 rounded border border-amber-800/50 bg-amber-900/20 px-2 py-1 text-xs text-amber-300">
+              Demo detail (Ollama offline)
+            </p>
+
+            <div v-if="verifiedExplanation || (!detailStreaming && detail?.explanation && !inferredExplanation)" class="mt-3">
+              <span class="inline-block rounded bg-green-900/40 px-1.5 py-0.5 text-[10px] font-bold uppercase text-green-400">
+                Verified
+              </span>
+              <p class="mt-2 text-sm leading-relaxed text-slate-300">
+                {{ verifiedExplanation || detail?.explanation }}
+                <span v-if="detailStreaming && !inferredExplanation" class="inline-block w-1.5 animate-pulse bg-onbober-primary">|</span>
+              </p>
+            </div>
+
+            <div v-if="inferredExplanation" class="mt-4">
+              <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-400">
+                Inferred
+              </span>
+              <p class="mt-1 text-[10px] text-slate-500">Based on codebase patterns — not verified against external API docs.</p>
+              <p class="mt-2 text-sm leading-relaxed text-amber-300/90">
+                {{ inferredExplanation }}
+                <span v-if="detailStreaming" class="inline-block w-1.5 animate-pulse bg-onbober-primary">|</span>
+              </p>
+            </div>
+
+            <div v-if="hasEvidence" class="mt-4">
+              <button
+                type="button"
+                class="text-left text-xs text-slate-400 hover:text-slate-200"
+                @click="evidenceOpen = !evidenceOpen"
+              >
+                {{ evidenceOpen ? 'Hide' : 'Show' }} evidence used ({{ detail?.evidence?.length }})
+              </button>
+              <ul v-if="evidenceOpen" class="mt-2 space-y-1">
+                <li
+                  v-for="(line, idx) in detail?.evidence"
+                  :key="idx"
+                  class="truncate font-mono text-[10px] text-slate-500"
+                  :title="line"
+                >
+                  {{ line }}
+                </li>
+              </ul>
+            </div>
+          </template>
+        </section>
+
         <p
-          v-if="selectedNode && !fullyExpanded && hasHiddenChildren(selectedNode.id)"
+          v-if="!fullyExpanded && hasHiddenChildren(selectedNode.id)"
           class="mt-3 text-xs text-onbober-primary"
         >
           Click again to reveal the next step{{ selectedNode.kind === 'branch' ? 's (branches)' : '' }}.
         </p>
+
         <div class="mt-4 flex flex-col gap-2">
           <button
-            v-if="selectedNode?.calleeFile"
+            v-if="selectedNode.calleeFile"
             type="button"
             class="text-left text-xs text-onbober-primary hover:underline"
             @click="emit('goToDefinition', selectedNode.calleeFile!, selectedNode.calleeLine ?? 1)"
@@ -340,15 +553,14 @@ function kindLabel(kind: string): string {
             Go to {{ selectedNode.calleeSymbol }} ({{ selectedNode.calleeFile }}:{{ selectedNode.calleeLine }})
           </button>
           <button
-            v-if="selectedNode?.file || detail?.file"
+            v-if="selectedNode.file || detail?.file"
             type="button"
             class="text-left text-xs text-slate-400 hover:text-onbober-primary hover:underline"
             @click="emit('viewSource')"
           >
-            View source{{ selectedNode?.line ? ` (line ${selectedNode.line})` : '' }}
+            View source{{ selectedNode.line ? ` (line ${selectedNode.line})` : '' }}
           </button>
         </div>
-      </template>
       </div>
     </aside>
   </div>
@@ -356,7 +568,19 @@ function kindLabel(kind: string): string {
 
 <style scoped>
 .mermaid-flow :deep(svg) {
-  max-width: 100%;
+  max-width: none;
   height: auto;
+}
+
+.mermaid-flow :deep(g.node.is-selected rect),
+.mermaid-flow :deep(g.node.is-selected polygon),
+.mermaid-flow :deep(g.node.is-selected path) {
+  stroke: #ff3366 !important;
+  stroke-width: 3px !important;
+}
+
+.mermaid-flow :deep(g.node.is-selected .label),
+.mermaid-flow :deep(g.node.is-selected .nodeLabel) {
+  fill: #fff !important;
 }
 </style>
