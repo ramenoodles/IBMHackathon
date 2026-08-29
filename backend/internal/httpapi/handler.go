@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -120,6 +121,13 @@ func (h *Handler) tree(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, map[string]any{"name": x.Name(), "path": p, "isDir": x.IsDir()})
 	}
+	sort.SliceStable(out, func(i, j int) bool {
+		di, dj := out[i]["isDir"].(bool), out[j]["isDir"].(bool)
+		if di != dj {
+			return di
+		}
+		return out[i]["name"].(string) < out[j]["name"].(string)
+	})
 	write(w, 200, map[string]any{"entries": out})
 }
 func (h *Handler) file(w http.ResponseWriter, r *http.Request) {
