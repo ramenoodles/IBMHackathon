@@ -7,12 +7,18 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/joho/godotenv"
+
 	"grepwrapper/internal/httpapi"
 	"grepwrapper/internal/llm"
 	"grepwrapper/internal/service"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
+		log.Fatalf("load .env: %v", err)
+	}
+
 	root := flag.String(
 		"root",
 		".",
