@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/copy-icons.mjs",
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
@@ -18,6 +19,7 @@
   "dependencies": {
     "mermaid": "^11.6.0",
     "shiki": "^3.4.0",
+    "vscode-material-icons": "^0.1.1",
     "vue": "^3.5.40",
     "vue-router": "^5.2.0"
   },
