@@ -64,8 +64,8 @@ func (s *Scanner) ResolveCallee(workspace, fromFile, symbol, lang string) (Calle
 		return ref, true
 	}
 
-	// Workspace-wide ripgrep.
-	matches, err := s.GrepSymbol(workspace, "", symbol)
+	// Workspace-wide ripgrep with language-aware patterns.
+	matches, err := s.GrepSymbolLang(workspace, fromFile, symbol, lang)
 	if err != nil || len(matches) == 0 {
 		return ref, true
 	}
@@ -158,6 +158,14 @@ func LanguageFromPath(filePath string) string {
 		return "cpp"
 	case ".rs":
 		return "rust"
+	case ".js", ".jsx", ".mjs", ".cjs":
+		return "javascript"
+	case ".ts", ".tsx", ".mts", ".cts":
+		return "typescript"
+	case ".java":
+		return "java"
+	case ".cs":
+		return "csharp"
 	default:
 		return "text"
 	}

@@ -196,10 +196,30 @@ The Go API is started the same way: `go run ./cmd/api` from `backend/`.
 
 ---
 
-## 7. Running tests
+## 7. grepwrapper CLI (optional)
+
+OnBober's symbol search uses Jack's [`grepwrapper`](../grepwrapper/) module (language-aware ripgrep). You can run the CLI directly for debugging:
+
+```powershell
+cd grepwrapper
+go run ./cmd/grepwrapper -root C:\path\to\repo -lang c start_kernel
+go run ./cmd/grepwrapper -root C:\path\to\repo -lang python -source context -before 3 -after 5 my_function
+```
+
+Supported languages: `auto`, `go`, `python`, `javascript`, `typescript`, `rust`, `java`, `c`, `cpp`, `csharp`.
+
+See [GREPWRAPPER_SYNC.md](GREPWRAPPER_SYNC.md) for subtree sync with Jack's `grepWrapper` branch.
+
+---
+
+## 8. Running tests
 
 ```bash
-# Backend
+# grepwrapper (Jack's module)
+cd grepwrapper
+go test ./...
+
+# Backend (uses grepwrapper via go.work)
 cd backend
 go test ./...
 
@@ -211,7 +231,7 @@ npm run build    # type-check + production build
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 ### `rg` not found / scan errors
 
@@ -248,7 +268,7 @@ Use an absolute path to the repo root. On Windows, prefer forward slashes or esc
 
 ---
 
-## 9. Quick reference — copy/paste
+## 10. Quick reference — copy/paste
 
 ```bash
 # One-time
@@ -267,4 +287,5 @@ Then open **http://localhost:5173**.
 ## Related docs
 
 - [README](../README.md) — project overview, API list, architecture notes
+- [GREPWRAPPER_SYNC.md](GREPWRAPPER_SYNC.md) — sync Jack's grepWrapper subtree
 - IBM Bob handoff notes in README → `backend/internal/graph/builder.go`

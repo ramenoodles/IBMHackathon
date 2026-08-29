@@ -57,3 +57,16 @@ func (s *Scanner) GrepLiteral(workspacePath, pattern string, max int) ([]Match, 
 	_ = cmd.Wait()
 	return matches, nil
 }
+
+type rgJSONLine struct {
+	Type string `json:"type"`
+	Data struct {
+		Path struct {
+			Text string `json:"text"`
+		} `json:"path"`
+		LineNumber int `json:"line_number"`
+		Lines      struct {
+			Text string `json:"text"`
+		} `json:"lines"`
+	} `json:"data"`
+}

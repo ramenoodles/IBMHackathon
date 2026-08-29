@@ -7,7 +7,9 @@ An onboarding compass for complex codebases. Pick a symbol, map its execution fl
 ```
 IBMHackathon/
 ├── frontend/     # Vue 3 graph-first UI
-└── backend/      # Go API with ripgrep scanner and Ollama JSON graphs
+├── backend/      # Go API with flow graphs and Ollama
+├── grepwrapper/  # Jack's ripgrep symbol finder (git subtree)
+└── go.work       # Go workspace linking backend + grepwrapper
 ```
 
 ## Prerequisites
@@ -29,7 +31,8 @@ IBMHackathon/
 
 ## Development
 
-**→ Full setup and run instructions: [docs/STARTUP.md](docs/STARTUP.md)**
+**→ Full setup and run instructions: [docs/STARTUP.md](docs/STARTUP.md)**  
+**→ grepWrapper subtree sync (Jack): [docs/GREPWRAPPER_SYNC.md](docs/GREPWRAPPER_SYNC.md)**
 
 Quick start:
 

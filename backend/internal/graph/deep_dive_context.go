@@ -79,6 +79,13 @@ func (b *Builder) buildDeepDiveBundle(input BuildInput, g FlowGraph, nodeID, cod
 		matches, _ := b.scanner.GrepLiteral(input.WorkspacePath, term, 4)
 		for _, m := range matches {
 			line := fmt.Sprintf("%s:%d: %s", m.File, m.Line, m.Content)
+			if ctx, err := b.scanner.ReadMatchContext(input.WorkspacePath, m.File, m.Line, 1, 1); err == nil && strings.TrimSpace(ctx) != "" {
+				flat := strings.ReplaceAll(strings.TrimSpace(ctx), "\n", " | ")
+				if len(flat) > 120 {
+					flat = flat[:117] + "..."
+				}
+				line = fmt.Sprintf("%s:%d: %s", m.File, m.Line, flat)
+			}
 			if seenEvidence[line] {
 				continue
 			}
