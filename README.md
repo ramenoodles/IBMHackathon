@@ -58,20 +58,21 @@ Open http://localhost:5173
 | GET | `/api/health` | Health check |
 | GET | `/api/tree?workspace=&dir=` | Directory listing |
 | GET | `/api/file?workspace=&path=` | File contents |
-| POST | `/api/graph/root` | Root execution-flow graph for a symbol |
-| POST | `/api/graph/expand` | Lazy-expand collapsed branch nodes |
-| GET | `/api/graph/node` | Detailed explanation for a node |
+| POST | `/api/graph/root` | Scan-built execution-flow graph for a symbol |
+| POST | `/api/graph/expand` | Lazy-expand collapsed branch/callee nodes (scan-only) |
+| POST | `/api/graph/enrich` | Async LLM summary patches for visible nodes |
+| GET | `/api/graph/node` | Detailed explanation for a node (LLM) |
 | POST | `/api/workspace/setup` | Register local path or clone GitHub repo |
 | POST | `/api/workspace/upload` | Extract uploaded zip archive |
 | POST | `/api/analyze` | *(deprecated)* Legacy SSE markdown analysis |
 
 ## IBM Bob Handoff
 
-- Graph system prompt: [`backend/prompts/graph_system.txt`](backend/prompts/graph_system.txt)
-- Graph builder with verified/inferred confidence merging: [`backend/internal/graph/builder.go`](backend/internal/graph/builder.go)
+- Scan-first graph builder: [`backend/internal/graph/builder.go`](backend/internal/graph/builder.go)
+- Hybrid flow extractor: [`backend/internal/scanner/flow/`](backend/internal/scanner/flow/)
 - Bounded expansion limits: max 8 root nodes, 6 expand nodes, depth 4
 
 ## Notes
 
-- If Ollama is offline, the backend returns a demo graph so the UI remains fully interactive.
+- If Ollama is offline, graphs still load instantly from source scans; summaries fall back to code lines.
 - Branch expansion requires explicit user confirmation to prevent compute bombs on large codebases.

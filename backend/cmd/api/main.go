@@ -39,6 +39,7 @@ func main() {
 	mux.HandleFunc("/api/analyze", h.Analyze)
 	mux.HandleFunc("/api/graph/root", h.GraphRoot)
 	mux.HandleFunc("/api/graph/expand", h.GraphExpand)
+	mux.HandleFunc("/api/graph/enrich", h.GraphEnrich)
 	mux.HandleFunc("/api/graph/node", h.GraphNode)
 	mux.HandleFunc("/api/workspace/setup", h.WorkspaceSetup)
 	mux.HandleFunc("/api/workspace/upload", h.WorkspaceUpload)

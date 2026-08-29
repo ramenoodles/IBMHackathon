@@ -20,6 +20,7 @@ export function useNodeDetail() {
     line?: number
     title?: string
     confidence?: FlowConfidence
+    code?: string
     experience?: string
     language?: string
   }): Promise<void> {
@@ -34,6 +35,7 @@ export function useNodeDetail() {
       if (params.file) q.set('file', params.file)
       if (params.line) q.set('line', String(params.line))
       if (params.title) q.set('title', params.title)
+      if (params.code) q.set('code', params.code)
       if (params.confidence) q.set('confidence', params.confidence)
       if (params.experience) q.set('experience', params.experience)
       if (params.language) q.set('language', params.language)

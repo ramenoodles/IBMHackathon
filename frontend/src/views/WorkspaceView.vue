@@ -22,11 +22,14 @@ const {
   edges,
   rootId,
   loading,
+  enriching,
   expanding,
   error: graphError,
   isMock,
   loadRoot,
   expandNode,
+  revealFromNode,
+  hasHiddenChildren,
 } = useFlowGraph()
 
 const { detail, loading: detailLoading, loadDetail } = useNodeDetail()
@@ -35,6 +38,7 @@ const selectedPath = ref('')
 const symbol = ref('')
 const selectedNodeId = ref('')
 const sourceOpen = ref(false)
+const sourcePath = ref('')
 
 const branchPromptOpen = ref(false)
 const branchNode = ref<FlowNode | null>(null)
@@ -61,6 +65,10 @@ async function onPickSymbol(name: string): Promise<void> {
   await loadRoot({ ...graphPayload(), symbol: name })
 }
 
+function onRevealNode(node: FlowNode): void {
+  revealFromNode(node.id)
+}
+
 function onSelectNode(node: FlowNode): void {
   selectedNodeId.value = node.id
   void loadDetail({
@@ -69,11 +77,22 @@ function onSelectNode(node: FlowNode): void {
     symbol: symbol.value,
     file: node.file ?? selectedPath.value,
     line: node.line,
-    title: node.label,
+    title: node.title ?? node.label,
     confidence: node.confidence,
+    code: node.code,
     experience: userContext.value.experienceLevel,
     language: userContext.value.primaryLanguage,
   })
+}
+
+function onViewSource(file?: string): void {
+  sourcePath.value = file ?? selectedPath.value
+  sourceOpen.value = true
+}
+
+function onGoToDefinition(file: string, _line: number): void {
+  sourcePath.value = file
+  sourceOpen.value = true
 }
 
 function onExpandNode(node: FlowNode): void {
@@ -137,6 +156,7 @@ function fileName(): string {
           :edges="edges"
           :root-id="rootId"
           :loading="loading"
+          :enriching="enriching"
           :expanding="expanding"
           :error="graphError"
           :is-mock="isMock"
@@ -144,9 +164,12 @@ function fileName(): string {
           :selected-node-id="selectedNodeId"
           :detail="detail"
           :detail-loading="detailLoading"
+          :has-hidden-children="hasHiddenChildren"
           @select-node="onSelectNode"
+          @reveal-node="onRevealNode"
           @expand-node="onExpandNode"
-          @view-source="sourceOpen = true"
+          @view-source="onViewSource()"
+          @go-to-definition="onGoToDefinition"
         />
       </div>
     </div>
@@ -154,9 +177,9 @@ function fileName(): string {
     <Modal :open="sourceOpen" title="Source" @close="sourceOpen = false">
       <div class="max-h-[60vh] overflow-auto">
         <CodePanel
-          v-if="selectedPath"
+          v-if="sourcePath || selectedPath"
           :workspace-path="userContext.workspacePath"
-          :file-path="selectedPath"
+          :file-path="sourcePath || selectedPath"
         />
       </div>
     </Modal>

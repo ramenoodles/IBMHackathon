@@ -25,8 +25,11 @@ type FlowNode struct {
 	Confidence Confidence `json:"confidence"`
 	File       string     `json:"file,omitempty"`
 	Line       int        `json:"line,omitempty"`
-	Code       string     `json:"code,omitempty"`
-	Expandable bool       `json:"expandable"`
+	Code           string     `json:"code,omitempty"`
+	CalleeSymbol   string     `json:"calleeSymbol,omitempty"`
+	CalleeFile     string     `json:"calleeFile,omitempty"`
+	CalleeLine     int        `json:"calleeLine,omitempty"`
+	Expandable     bool       `json:"expandable"`
 	ChildCount int        `json:"childCount"`
 	Collapsed  bool       `json:"collapsed"`
 }

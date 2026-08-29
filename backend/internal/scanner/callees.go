@@ -15,7 +15,10 @@ type SymbolDef struct {
 // CalleeRef is a function call extracted from source.
 type CalleeRef struct {
 	Name       string
+	Qualified  string
 	Line       int
+	DefFile    string
+	DefLine    int
 	Confidence string
 }
 
@@ -45,6 +48,53 @@ func (s *Scanner) FindSymbolDefinition(workspace, filePath, symbol string) (Symb
 		}
 	}
 	return SymbolDef{}, false
+}
+
+// ResolveCallee finds the definition file and line for a callee symbol.
+func (s *Scanner) ResolveCallee(workspace, fromFile, symbol, lang string) (CalleeRef, bool) {
+	if symbol == "" {
+		return CalleeRef{}, false
+	}
+	ref := CalleeRef{Name: symbol, Qualified: symbol, Confidence: "verified"}
+
+	// Same-file definition first.
+	if def, ok := s.FindSymbolDefinition(workspace, fromFile, symbol); ok {
+		ref.DefFile = def.File
+		ref.DefLine = def.Line
+		return ref, true
+	}
+
+	// Workspace-wide ripgrep.
+	matches, err := s.GrepSymbol(workspace, "", symbol)
+	if err != nil || len(matches) == 0 {
+		return ref, true
+	}
+	for _, m := range matches {
+		if looksLikeDefinition(m.Content, symbol, lang) {
+			ref.DefFile = m.File
+			ref.DefLine = m.Line
+			return ref, true
+		}
+	}
+	ref.DefFile = matches[0].File
+	ref.DefLine = matches[0].Line
+	return ref, true
+}
+
+func looksLikeDefinition(line, symbol, lang string) bool {
+	trimmed := strings.TrimSpace(line)
+	switch lang {
+	case "python":
+		return strings.Contains(trimmed, "def "+symbol) || strings.Contains(trimmed, "class "+symbol)
+	case "go":
+		return strings.Contains(trimmed, "func "+symbol) || strings.Contains(trimmed, "func ("+symbol)
+	case "javascript", "typescript":
+		return strings.Contains(trimmed, "function "+symbol) ||
+			strings.Contains(trimmed, symbol+"(") && strings.Contains(trimmed, "{") ||
+			strings.Contains(trimmed, symbol+" =")
+	default:
+		return strings.Contains(trimmed, symbol)
+	}
 }
 
 // FindCalleesInSnippet extracts likely function calls from a code snippet.

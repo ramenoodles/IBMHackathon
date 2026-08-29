@@ -121,7 +121,7 @@ func (h *Handler) GraphNode(w http.ResponseWriter, r *http.Request) {
 		Symbol:        symbol,
 		Experience:    r.URL.Query().Get("experience"),
 		Language:      r.URL.Query().Get("language"),
-	}, nodeID, title, line, confidence)
+	}, nodeID, title, line, confidence, r.URL.Query().Get("code"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

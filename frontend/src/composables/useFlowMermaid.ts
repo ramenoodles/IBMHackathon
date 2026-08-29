@@ -62,6 +62,20 @@ export function mermaidId(id: string): string {
 }
 
 /**
+ * Plain label for graph boxes — prefer LLM title, never raw code literals.
+ */
+export function nodeDisplayTitle(node: FlowNode): string {
+  if (node.title) return node.title
+  const s = node.summary?.trim()
+  if (s && !looksLikeCode(s)) return s
+  return node.label.replace(/^L\d+\s+/, '')
+}
+
+function looksLikeCode(text: string): boolean {
+  return /[{}"'`;=]/.test(text) || text.startsWith('return ')
+}
+
+/**
  * Compile flow graph nodes and edges into Mermaid flowchart syntax.
  * @param nodes - Graph nodes.
  * @param edges - Graph edges.
@@ -87,9 +101,14 @@ export function compileToMermaid(
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i]!
     const mid = mermaidNodeId(i)
-    const label = node.collapsed ? `${node.label} (+${node.childCount})` : node.label
+    const display = nodeDisplayTitle(node)
+    const label = node.collapsed ? `${display} (+${node.childCount})` : display
     const safe = escapeMermaidLabel(label)
-    lines.push(`  ${mid}["${safe}"]`)
+    if (node.kind === 'branch') {
+      lines.push(`  ${mid}{"${safe}"}`)
+    } else {
+      lines.push(`  ${mid}["${safe}"]`)
+    }
 
     const classes: string[] = []
     if (selectedNodeId === node.id) {

@@ -5,12 +5,16 @@ export type FlowConfidence = 'verified' | 'inferred'
 export interface FlowNode {
   id: string
   label: string
+  title?: string
   summary: string
   kind: string
   confidence: FlowConfidence
   file?: string
   line?: number
   code?: string
+  calleeSymbol?: string
+  calleeFile?: string
+  calleeLine?: number
   expandable: boolean
   childCount: number
   collapsed: boolean
@@ -30,6 +34,28 @@ export interface FlowGraph {
   edges: FlowEdge[]
   depth: number
   symbol: string
+  mock?: boolean
+}
+
+/** Node sent for summary enrichment. */
+export interface EnrichNodeInput {
+  id: string
+  line: number
+  code: string
+  kind: string
+}
+
+/** Summary patch from enrich endpoint. */
+export interface EnrichPatch {
+  id: string
+  title?: string
+  summary: string
+  relatedSymbols?: string[]
+}
+
+/** Enrich API response. */
+export interface EnrichResult {
+  patches: EnrichPatch[]
   mock?: boolean
 }
 
