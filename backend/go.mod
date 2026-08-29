@@ -1,4 +1,4 @@
-module grepwrapper
+module github.com/ramenoodles/IBMHackathon/backend
 
 go 1.22
 

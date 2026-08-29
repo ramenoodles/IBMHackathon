@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	llmclient "grepwrapper/internal/llm"
+	llmclient "github.com/ramenoodles/IBMHackathon/backend/internal/llm"
 )
 
 var ErrLLMUnavailable = errors.New("LLM is not configured")

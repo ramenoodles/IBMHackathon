@@ -14,7 +14,7 @@ The implementation lives under `backend/internal/search` and `backend/internal/s
 ## Usage (from another module in go.work)
 
 ```go
-import "grepwrapper/bridge"
+import "backend/bridge"
 
 finder := bridge.NewFinder("") // "" → use "rg" on PATH
 matches, err := finder.Find(ctx, bridge.Query{

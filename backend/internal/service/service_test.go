@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	llmclient "grepwrapper/internal/llm"
+	llmclient "github.com/ramenoodles/IBMHackathon/backend/internal/llm"
 )
 
 type fakeLLM struct {

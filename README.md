@@ -4,15 +4,15 @@ OnBober is a repository onboarding UI backed by one Go API server.
 
 ## Development
 
-Requirements: Go 1.22, Node.js, npm, Git for GitHub sources, and ripgrep.
+Requirements: Go 1.22, Node.js, pnpm, Git for GitHub sources, and ripgrep.
 
 ```sh
 cd backend
 go run ./cmd/api
 
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 The frontend proxies `/api` to `http://localhost:8080`.

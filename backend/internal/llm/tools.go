@@ -8,8 +8,8 @@ import (
 
 	wx "github.com/IBM/watsonx-go/pkg/models"
 
-	"grepwrapper/internal/search"
-	"grepwrapper/internal/source"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/search"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/source"
 )
 
 const maxToolOutput = 16000

@@ -5,8 +5,8 @@ package bridge
 import (
 	"context"
 
-	"grepwrapper/internal/search"
-	"grepwrapper/internal/source"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/search"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/source"
 )
 
 // Query describes a symbol search (alias of search.Query).

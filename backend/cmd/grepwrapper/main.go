@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"grepwrapper/internal/cli"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/cli"
 )
 
 func main() {

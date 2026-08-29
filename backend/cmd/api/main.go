@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"grepwrapper/internal/config"
-	"grepwrapper/internal/httpapi"
-	"grepwrapper/internal/workspace"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/config"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/httpapi"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/workspace"
 	"log"
 	"net/http"
 	"os"

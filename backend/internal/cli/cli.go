@@ -8,8 +8,8 @@ import (
 	"io"
 	"strings"
 
-	"grepwrapper/internal/search"
-	"grepwrapper/internal/source"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/search"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/source"
 )
 
 const usage = `Usage:
