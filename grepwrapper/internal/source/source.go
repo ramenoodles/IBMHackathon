@@ -18,6 +18,8 @@ type Reader struct {
 	root string
 }
 
+func (reader *Reader) Root() string { return reader.root }
+
 // Returns a new reader while doing basic validtion before hand
 func NewReader(root string) (*Reader, error) {
 	if strings.TrimSpace(root) == "" {
@@ -133,6 +135,13 @@ func (reader *Reader) resolve(relativePath string) (string, error) {
 			"source path %q escapes codebase root",
 			relativePath,
 		)
+	}
+	resolved, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		resolvedRelative, relErr := filepath.Rel(reader.root, resolved)
+		if relErr != nil || resolvedRelative == ".." || strings.HasPrefix(resolvedRelative, ".."+string(filepath.Separator)) {
+			return "", fmt.Errorf("source path %q escapes codebase root", relativePath)
+		}
 	}
 
 	return path, nil

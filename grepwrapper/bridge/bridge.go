@@ -1,5 +1,5 @@
 // Package bridge exposes grepwrapper search and source APIs for external modules
-// (e.g. OnBober backend). Jack's internal packages stay unchanged.
+// It exposes the stable search primitives without leaking internal packages.
 package bridge
 
 import (

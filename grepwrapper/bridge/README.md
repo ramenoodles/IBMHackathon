@@ -4,7 +4,7 @@ Public integration layer for the **grepwrapper** Go module.
 
 ## Why this package exists
 
-Jack's implementation lives under `grepwrapper/internal/search` and `grepwrapper/internal/source`. Go's `internal` visibility rules mean **other modules** (like OnBober's `backend`) cannot import those packages directly.
+The implementation lives under `backend/internal/search` and `backend/internal/source`.
 
 `bridge` re-exports the minimum surface needed by external consumers:
 
@@ -25,9 +25,6 @@ matches, err := finder.Find(ctx, bridge.Query{
 })
 ```
 
-## OnBober
-
-OnBober calls this package from [`backend/internal/scanner/grepwrapper_adapter.go`](../../backend/internal/scanner/grepwrapper_adapter.go). Prefer extending `bridge` over importing `internal/` from outside this module.
 
 ## Ownership
 
