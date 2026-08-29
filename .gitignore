@@ -34,9 +34,13 @@ yarn-error.log*
 .env*
 !.env.example
 
-# grepwrapper CLI binary (built from grepwrapper/)
-grepwrapper/grepwrapper
-grepwrapper/grepwrapper.exe
+# grepwrapper binaries (built from backend/)
+backend/api
+backend/api.exe
+backend/grepwrapper
+backend/grepwrapper.exe
+backend/main
+backend/main.exe
 
 # vercel
 .vercel

@@ -4,9 +4,10 @@
  */
 import { onMounted, ref, watch } from 'vue'
 import { extractFunctions } from '@/composables/useSymbols'
+import { api } from '@/api'
 
 const props = defineProps<{
-  workspacePath: string
+  workspaceId: string
   filePath: string
   activeSymbol: string
   symbolNames?: string[]
@@ -20,7 +21,7 @@ const functions = ref<string[]>([])
 const loading = ref(false)
 
 async function load(): Promise<void> {
-  if (!props.workspacePath || !props.filePath) {
+  if (!props.workspaceId || !props.filePath) {
     functions.value = []
     return
   }
@@ -30,10 +31,7 @@ async function load(): Promise<void> {
   }
   loading.value = true
   try {
-    const params = new URLSearchParams({ workspace: props.workspacePath, path: props.filePath })
-    const res = await fetch(`/api/file?${params}`)
-    if (!res.ok) return
-    const data = (await res.json()) as { content: string }
+     const data = await api.file(props.workspaceId, props.filePath)
     functions.value = extractFunctions(data.content, props.filePath)
   } finally {
     loading.value = false

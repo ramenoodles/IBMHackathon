@@ -1,100 +1,22 @@
 # OnBober
 
-An onboarding compass for complex codebases. Pick a symbol, map its execution flow, expand branches lazily, and get tailored explanations at each step.
-
-## Documentation
-
-| Doc | Who it's for |
-|-----|----------------|
-| [docs/README.md](docs/README.md) | Documentation index |
-| [docs/STARTUP.md](docs/STARTUP.md) | Run the app locally |
-| [docs/CODEBASE.md](docs/CODEBASE.md) | **New here?** Architecture, request flow, where to edit |
-| [docs/GREPWRAPPER.md](docs/GREPWRAPPER.md) | How symbol search integrates with the backend |
-| [docs/GREPWRAPPER_SYNC.md](docs/GREPWRAPPER_SYNC.md) | Sync Jack's `grepWrapper` git subtree |
-| [backend/README.md](backend/README.md) | Backend package map and endpoints |
-
-## Project Structure
-
-```
-IBMHackathon/
-├── frontend/     # Vue 3 graph-first UI
-├── backend/      # Go API with flow graphs and Ollama
-├── grepwrapper/  # Jack's ripgrep symbol finder (git subtree)
-└── go.work       # Go workspace linking backend + grepwrapper
-```
-
-## Prerequisites
-
-- **Node.js** 22+ and **npm**
-- **Go** 1.22+
-- **ripgrep** (`rg`) on PATH
-- **git** on PATH (for GitHub clone option)
-- **Ollama** running locally with a model pulled (e.g. `ollama pull qwen2.5:7b`)
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8080` | Backend API port |
-| `OLLAMA_URL` | `http://localhost:11434` | Ollama base URL |
-| `OLLAMA_MODEL` | `qwen2.5:7b` | Model name for graph generation and deep dive |
-| `ONBOBER_WORKSPACE_ROOT` | `%TEMP%/onbober-workspaces` | Storage for cloned/uploaded repos |
+OnBober is a repository onboarding UI backed by one Go API server.
 
 ## Development
 
-**→ Full setup: [docs/STARTUP.md](docs/STARTUP.md)**  
-**→ Codebase tour: [docs/CODEBASE.md](docs/CODEBASE.md)**  
-**→ grepWrapper sync (Jack): [docs/GREPWRAPPER_SYNC.md](docs/GREPWRAPPER_SYNC.md)**
+Requirements: Go 1.22, Node.js, pnpm, Git for GitHub sources, and ripgrep.
 
-Quick start:
-
-```bash
-# One-time
-ollama pull qwen2.5:7b
-cd frontend && npm install && cd ..
-
-# Terminal 1 — Backend
+```sh
 cd backend
 go run ./cmd/api
 
-# Terminal 2 — Frontend
 cd frontend
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
-Open http://localhost:5173
+The frontend proxies `/api` to `http://localhost:8080`.
 
-## Demo Flow
-
-1. Complete onboarding (language, experience, workspace path / GitHub / zip)
-2. Open a file from the explorer
-3. Click a **symbol chip** in the code drawer
-4. View the **execution flow graph** in the center panel
-5. Click a **collapsed branch** (`+N`) to expand with a branch budget prompt
-6. Click any step to see **node details** in the right drawer
-
-## API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/tree?workspace=&dir=` | Directory listing |
-| GET | `/api/file?workspace=&path=` | File contents |
-| POST | `/api/graph/root` | Scan-built execution-flow graph for a symbol |
-| POST | `/api/graph/expand` | Lazy-expand collapsed branch/callee nodes (scan-only) |
-| POST | `/api/graph/enrich` | Async LLM summary patches for visible nodes |
-| GET | `/api/graph/node` | Detailed explanation for a node (LLM) |
-| POST | `/api/workspace/setup` | Register local path or clone GitHub repo |
-| POST | `/api/workspace/upload` | Extract uploaded zip archive |
-| POST | `/api/analyze` | *(deprecated)* Legacy SSE markdown analysis |
-
-## IBM Bob Handoff
-
-- Scan-first graph builder: [`backend/internal/graph/builder.go`](backend/internal/graph/builder.go)
-- Hybrid flow extractor: [`backend/internal/scanner/flow/`](backend/internal/scanner/flow/)
-- Bounded expansion limits: max 8 root nodes, 6 expand nodes, depth 4
-
-## Notes
-
-- If Ollama is offline, graphs still load instantly from source scans; summaries fall back to code lines.
-- Branch expansion requires explicit user confirmation to prevent compute bombs on large codebases.
+Configure optional Watsonx explanations with `WATSONX_API_KEY`,
+`WATSONX_PROJECT_ID`, and `WATSONX_MODEL`. Server settings are `HOST`, `PORT`,
+and `RG_BINARY`.

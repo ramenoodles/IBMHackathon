@@ -1,224 +1,147 @@
-// Package workspace manages local, uploaded, and cloned codebases.
 package workspace
 
 import (
 	"archive/zip"
+	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
+	"sync"
 	"time"
-
-	"github.com/ibmhackathon/onbober/internal/scanner"
 )
 
-// Manager handles workspace registration from multiple sources.
+type Workspace struct {
+	ID, Name, Source string
+	Root             string
+	Temporary        bool
+	CreatedAt        time.Time
+}
 type Manager struct {
-	root string
+	mu       sync.RWMutex
+	items    map[string]Workspace
+	tempRoot string
 }
 
-// NewManager creates a workspace manager with the given storage root directory.
-func NewManager(root string) (*Manager, error) {
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		return nil, fmt.Errorf("create workspace root: %w", err)
+func NewManager() (*Manager, error) {
+	root, err := os.MkdirTemp("", "grepwrapper-workspaces-")
+	if err != nil {
+		return nil, err
 	}
-	return &Manager{root: root}, nil
+	return &Manager{items: map[string]Workspace{}, tempRoot: root}, nil
 }
-
-// RegisterLocal validates an existing directory on disk.
-func (m *Manager) RegisterLocal(path string) (string, error) {
-	return scanner.SafePath(path)
+func (m *Manager) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, w := range m.items {
+		if w.Temporary {
+			_ = os.RemoveAll(w.Root)
+		}
+	}
+	return os.RemoveAll(m.tempRoot)
 }
-
-var githubURLPattern = regexp.MustCompile(`^(?:https?://)?(?:www\.)?github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?/?$`)
-var githubShortPattern = regexp.MustCompile(`^([\w.-]+)/([\w.-]+)$`)
-
-// CloneGitHub shallow-clones a public GitHub repository into the workspace root.
-func (m *Manager) CloneGitHub(url string) (string, error) {
-	owner, repo, err := parseGitHubURL(url)
-	if err != nil {
-		return "", err
-	}
-
-	dest := filepath.Join(m.root, fmt.Sprintf("%s-%s-%d", owner, repo, time.Now().Unix()))
-	cloneURL := fmt.Sprintf("https://github.com/%s/%s.git", owner, repo)
-
-	cmd := exec.Command("git", "clone", "--depth", "1", cloneURL, dest)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("git clone failed (is git installed?): %w", err)
-	}
-
-	return dest, nil
+func (m *Manager) Get(id string) (Workspace, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	w, ok := m.items[id]
+	return w, ok
 }
-
-// parseGitHubURL extracts owner and repo from common GitHub URL formats.
-func parseGitHubURL(raw string) (string, string, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return "", "", fmt.Errorf("github url is required")
+func (m *Manager) add(root, name, source string, temporary bool) (Workspace, error) {
+	info, err := os.Stat(root)
+	if err != nil || !info.IsDir() {
+		return Workspace{}, fmt.Errorf("workspace is not a directory")
 	}
-
-	if matches := githubURLPattern.FindStringSubmatch(raw); len(matches) == 3 {
-		return matches[1], strings.TrimSuffix(matches[2], ".git"), nil
-	}
-	if matches := githubShortPattern.FindStringSubmatch(raw); len(matches) == 3 {
-		return matches[1], matches[2], nil
-	}
-	return "", "", fmt.Errorf("invalid github url: use https://github.com/owner/repo or owner/repo")
+	id := randomID()
+	w := Workspace{ID: id, Name: name, Source: source, Root: root, Temporary: temporary, CreatedAt: time.Now()}
+	m.mu.Lock()
+	m.items[id] = w
+	m.mu.Unlock()
+	return w, nil
 }
-
-const maxZipSize = 200 * 1024 * 1024 // 200MB
-
-// ExtractZip saves and extracts an uploaded zip archive into the workspace root.
-func (m *Manager) ExtractZip(r io.Reader, filename string) (string, error) {
-	safeName := sanitizeFilename(filename)
-	if safeName == "" {
-		safeName = "upload"
+func randomID() string {
+	b := make([]byte, 12)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("ws-%d", time.Now().UnixNano())
 	}
-
-	dest := filepath.Join(m.root, fmt.Sprintf("%s-%d", strings.TrimSuffix(safeName, ".zip"), time.Now().Unix()))
-	if err := os.MkdirAll(dest, 0o755); err != nil {
-		return "", err
-	}
-
-	zipPath := filepath.Join(dest, safeName)
-	out, err := os.Create(zipPath)
-	if err != nil {
-		return "", err
-	}
-
-	written, err := io.Copy(out, io.LimitReader(r, maxZipSize+1))
-	out.Close()
-	if err != nil {
-		os.RemoveAll(dest)
-		return "", err
-	}
-	if written > maxZipSize {
-		os.RemoveAll(dest)
-		return "", fmt.Errorf("zip exceeds maximum size (%d MB)", maxZipSize/(1024*1024))
-	}
-
-	extractDir := filepath.Join(dest, "src")
-	if err := os.MkdirAll(extractDir, 0o755); err != nil {
-		os.RemoveAll(dest)
-		return "", err
-	}
-	if err := unzip(zipPath, extractDir); err != nil {
-		os.RemoveAll(dest)
-		return "", err
-	}
-	_ = os.Remove(zipPath)
-
-	// If zip contained a single top-level folder, use that as workspace root.
-	entries, err := os.ReadDir(extractDir)
-	if err != nil {
-		os.RemoveAll(dest)
-		return "", err
-	}
-	if len(entries) == 1 && entries[0].IsDir() {
-		return filepath.Join(extractDir, entries[0].Name()), nil
-	}
-	return extractDir, nil
+	return fmt.Sprintf("ws-%x", b)
 }
-
-// unzip extracts all files from zipPath into dest.
-func unzip(zipPath, dest string) error {
-	reader, err := zip.OpenReader(zipPath)
+func (m *Manager) Local(path string) (Workspace, error) {
+	path, err := filepath.Abs(path)
 	if err != nil {
-		return err
+		return Workspace{}, err
 	}
-	defer reader.Close()
-
-	destAbs, err := filepath.Abs(dest)
+	return m.add(path, filepath.Base(path), "local", false)
+}
+func (m *Manager) GitHub(ctx context.Context, url string) (Workspace, error) {
+	if strings.TrimSpace(url) == "" {
+		return Workspace{}, fmt.Errorf("repository URL is required")
+	}
+	dir, err := os.MkdirTemp(m.tempRoot, "git-")
 	if err != nil {
-		return err
+		return Workspace{}, err
 	}
-
-	for _, f := range reader.File {
-		target, err := safeZipTarget(destAbs, f.Name)
-		if err != nil {
-			return err
+	cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", url, dir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		_ = os.RemoveAll(dir)
+		return Workspace{}, fmt.Errorf("clone repository: %s", strings.TrimSpace(string(out)))
+	}
+	return m.add(dir, filepath.Base(strings.TrimSuffix(url, "/")), "github", true)
+}
+func (m *Manager) Zip(file io.Reader, name string, size int64) (Workspace, error) {
+	if size > 200<<20 {
+		return Workspace{}, fmt.Errorf("zip upload exceeds 200 MB")
+	}
+	dir, err := os.MkdirTemp(m.tempRoot, "zip-")
+	if err != nil {
+		return Workspace{}, err
+	}
+	archive, err := os.CreateTemp("", "workspace-*.zip")
+	if err != nil {
+		return Workspace{}, err
+	}
+	defer os.Remove(archive.Name())
+	if _, err = io.Copy(archive, io.LimitReader(file, 200<<20+1)); err != nil {
+		return Workspace{}, err
+	}
+	if err = archive.Close(); err != nil {
+		return Workspace{}, err
+	}
+	zr, err := zip.OpenReader(archive.Name())
+	if err != nil {
+		return Workspace{}, fmt.Errorf("invalid zip: %w", err)
+	}
+	defer zr.Close()
+	for _, f := range zr.File {
+		target := filepath.Join(dir, filepath.Clean(f.Name))
+		rel, err := filepath.Rel(dir, target)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return Workspace{}, fmt.Errorf("zip entry escapes workspace: %s", f.Name)
 		}
 		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(target, 0o755); err != nil {
-				return err
+			if err = os.MkdirAll(target, 0755); err != nil {
+				return Workspace{}, err
 			}
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
+		if err = os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			return Workspace{}, err
 		}
-		if err := extractZipFile(f, target); err != nil {
-			return err
+		in, err := f.Open()
+		if err != nil {
+			return Workspace{}, err
+		}
+		out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+		if err == nil {
+			_, err = io.Copy(out, in)
+		}
+		_ = in.Close()
+		_ = out.Close()
+		if err != nil {
+			return Workspace{}, err
 		}
 	}
-	return nil
-}
-
-// safeZipTarget prevents zip slip path traversal attacks.
-func safeZipTarget(destAbs, name string) (string, error) {
-	target := filepath.Join(destAbs, filepath.Clean(strings.ReplaceAll(name, "\\", "/")))
-	targetAbs, err := filepath.Abs(target)
-	if err != nil {
-		return "", err
-	}
-	if !strings.HasPrefix(targetAbs, destAbs+string(os.PathSeparator)) && targetAbs != destAbs {
-		return "", fmt.Errorf("illegal zip path: %s", name)
-	}
-	return targetAbs, nil
-}
-
-// extractZipFile writes a single zip entry to disk.
-func extractZipFile(f *zip.File, target string) error {
-	rc, err := f.Open()
-	if err != nil {
-		return err
-	}
-	defer rc.Close()
-
-	out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, rc)
-	return err
-}
-
-// sanitizeFilename strips unsafe characters from an upload filename.
-func sanitizeFilename(name string) string {
-	name = filepath.Base(name)
-	name = strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.' || r == '-' || r == '_' {
-			return r
-		}
-		return '_'
-	}, name)
-	return name
-}
-
-// PingGit checks whether git is available on PATH.
-func PingGit() error {
-	cmd := exec.Command("git", "--version")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git not found on PATH")
-	}
-	return nil
-}
-
-// IsGitHubReachable performs a lightweight HEAD request to github.com.
-func IsGitHubReachable() bool {
-	resp, err := http.Head("https://github.com")
-	if err != nil {
-		return false
-	}
-	resp.Body.Close()
-	return resp.StatusCode < 500
+	return m.add(dir, strings.TrimSuffix(name, filepath.Ext(name)), "zip", true)
 }
