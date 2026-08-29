@@ -6,6 +6,8 @@ import (
 
 	"grepwrapper/internal/search"
 	"grepwrapper/internal/source"
+
+	llmclient "grepwrapper/internal/llm"
 )
 
 type LookupRequest struct {
@@ -30,11 +32,13 @@ type Service struct {
 	root   string         // which codebase we are allowed to inspect
 	finder *search.Finder // finds declarations using ripgrep
 	reader *source.Reader // reads the source code from the files finder locations
+	llm    llmclient.Client
 }
 
 func New(
 	root string,
 	rgBinary string,
+	client llmclient.Client,
 ) (*Service, error) {
 	reader, err := source.NewReader(root)
 	if err != nil {
@@ -45,6 +49,7 @@ func New(
 		root:   root,
 		finder: search.NewFinder(rgBinary),
 		reader: reader,
+		llm:    client,
 	}, nil
 }
 
