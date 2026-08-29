@@ -1,4 +1,3 @@
-// Package search wraps ripgrep and turns declaration matches into structured data.
 package search
 
 import (
