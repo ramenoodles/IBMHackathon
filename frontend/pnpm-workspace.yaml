@@ -1,3 +1,6 @@
+allowBuilds:
+  esbuild: set this to true or false
+
 overrides:
   'vue': 'rc'
   '@vue/compiler-core': 'rc'

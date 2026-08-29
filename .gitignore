@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # grepwrapper CLI binary (built from grepwrapper/)
 grepwrapper/grepwrapper
@@ -43,3 +44,5 @@ grepwrapper/grepwrapper.exe
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.opencode/
