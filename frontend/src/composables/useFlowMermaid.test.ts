@@ -42,7 +42,7 @@ describe('useNodeDetail cache', () => {
     const { useNodeDetail } = await import('@/composables/useNodeDetail')
     const { loadDetail, detail } = useNodeDetail()
     const params = {
-      workspace: 'ws',
+      workspaceId: 'ws',
       nodeId: 'n1',
       symbol: 'fn',
       file: 'a.py',

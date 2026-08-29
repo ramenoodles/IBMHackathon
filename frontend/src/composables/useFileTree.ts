@@ -14,10 +14,10 @@ export interface TreeEntry {
  * @returns List of files and folders with paths relative to workspace root.
  */
 export async function fetchTreeEntries(workspace: string, dir = ''): Promise<TreeEntry[]> {
-  const params = new URLSearchParams({ workspace })
+  const params = new URLSearchParams()
   if (dir) params.set('dir', dir)
 
-  const res = await fetch(`/api/tree?${params}`)
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(workspace)}/tree?${params}`)
   if (!res.ok) {
     const msg = await res.text()
     throw new Error(msg || `Failed to load tree (${res.status})`)

@@ -10,7 +10,7 @@ import { getFileIconUrl, getFolderIconUrl } from '@/composables/useFileIcon'
 
 const props = defineProps<{
   /** Workspace root path. */
-  workspacePath: string
+  workspaceId: string
   /** This node's entry metadata. */
   entry: TreeEntry
   /** Currently selected file path relative to workspace. */
@@ -48,7 +48,7 @@ async function loadChildren(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    children.value = await fetchTreeEntries(props.workspacePath, props.entry.path)
+    children.value = await fetchTreeEntries(props.workspaceId, props.entry.path)
     loaded.value = true
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load folder'
@@ -99,7 +99,7 @@ function onFileClick(): void {
       <FileTreeNode
         v-for="child in children"
         :key="child.path"
-        :workspace-path="workspacePath"
+        :workspace-id="workspaceId"
         :entry="child"
         :selected-path="selectedPath"
         :depth="depth + 1"

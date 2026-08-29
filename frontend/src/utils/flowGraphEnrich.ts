@@ -3,7 +3,7 @@ import type { FlowGraph } from '@/types/flowGraph'
 import type { SymbolFlowState } from '@/utils/flowGraphUtils'
 
 export async function fetchGraphRoot(payload: GraphRootPayload): Promise<FlowGraph> {
-  const res = await fetch('/api/graph/root', {
+  const res = await fetch(`/api/workspaces/${encodeURIComponent(payload.workspaceId)}/graphs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -36,11 +36,11 @@ export async function enrichSymbolNodes(
           kind: n.kind,
         }
       })
-      const res = await fetch('/api/graph/enrich', {
+      const res = await fetch(`/api/workspaces/${encodeURIComponent(payload.workspaceId)}/explain`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          workspacePath: payload.workspacePath,
+          workspaceId: payload.workspaceId,
           filePath: payload.filePath,
           symbol: payload.symbol,
           nodes: enrichInputs,

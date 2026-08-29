@@ -12,8 +12,8 @@ export function useSymbolBrief() {
 
   const isLargeFile = ref(false)
 
-  async function load(workspacePath: string, filePath: string): Promise<void> {
-    if (!workspacePath || !filePath) {
+  async function load(workspaceId: string, filePath: string): Promise<void> {
+    if (!workspaceId || !filePath) {
       symbols.value = []
       isLargeFile.value = false
       return
@@ -21,8 +21,8 @@ export function useSymbolBrief() {
     loading.value = true
     error.value = null
     try {
-      const params = new URLSearchParams({ workspace: workspacePath, path: filePath })
-      const res = await fetch(`/api/file/symbols?${params}`)
+      const params = new URLSearchParams({ path: filePath })
+      const res = await fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/symbols?${params}`)
       if (!res.ok) throw new Error(`Symbol scan failed (${res.status})`)
       const data = (await res.json()) as { symbols: FileSymbol[]; count: number }
       symbols.value = data.symbols ?? []

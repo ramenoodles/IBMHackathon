@@ -490,7 +490,7 @@ const showExpandHint = computed(
             </p>
             <p v-if="detailError" class="mt-2 text-sm text-red-400">{{ detailError }}</p>
             <p v-if="detail?.mock" class="mt-2 rounded border border-amber-800/50 bg-amber-900/20 px-2 py-1 text-xs text-amber-300">
-              Demo detail (Ollama offline)
+              Watsonx explanation unavailable
             </p>
 
             <div v-if="verifiedExplanation || (!detailStreaming && detail?.explanation && !inferredExplanation)" class="mt-3">

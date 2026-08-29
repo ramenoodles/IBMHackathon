@@ -211,7 +211,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     path: string[],
     limit: number,
   ): Promise<FlowGraph | null> {
-    const res = await fetch('/api/graph/expand', {
+    const res = await fetch(`/api/workspaces/${encodeURIComponent(payload.workspaceId)}/graphs/expand`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -279,7 +279,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     if (!cached) return false
     error.value = null
     currentFilePath.value = payload.filePath
-    currentWorkspace.value = payload.workspacePath
+    currentWorkspace.value = payload.workspaceId
     lastPayload.value = { ...payload, symbol: sym }
     hydrateFromState(cached, sym)
     maintainSilentBuffer()
@@ -296,7 +296,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     error.value = null
     parentPath.value = []
     currentFilePath.value = payload.filePath
-    currentWorkspace.value = payload.workspacePath
+    currentWorkspace.value = payload.workspaceId
     symbol.value = payload.symbol
     lastPayload.value = payload
     enrichedIds.value = new Set()

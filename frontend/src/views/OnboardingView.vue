@@ -32,7 +32,7 @@ const selectedLanguage = ref(userContext.value.primaryLanguage || '')
 const selectedLevel = ref<ExperienceLevel>(userContext.value.experienceLevel || 'junior')
 
 const sourceTab = ref<WorkspaceSource>('local')
-const localPath = ref(userContext.value.workspacePath || '')
+const localPath = ref('')
 const githubUrl = ref('')
 const zipFile = ref<File | null>(null)
 
@@ -67,15 +67,16 @@ async function nextStep(): Promise<void> {
     updateUserContext({ experienceLevel: selectedLevel.value })
   } else if (step.value === 3) {
     try {
-      let workspacePath = ''
+      let workspace: { id: string; name: string } | undefined
       if (sourceTab.value === 'local') {
-        workspacePath = await setupLocal(localPath.value.trim())
+        workspace = await setupLocal(localPath.value.trim())
       } else if (sourceTab.value === 'github') {
-        workspacePath = await setupGitHub(githubUrl.value.trim())
+        workspace = await setupGitHub(githubUrl.value.trim())
       } else if (sourceTab.value === 'zip' && zipFile.value) {
-        workspacePath = await setupZip(zipFile.value)
+        workspace = await setupZip(zipFile.value)
       }
-      updateUserContext({ workspacePath })
+      if (!workspace) return
+      updateUserContext({ workspaceId: workspace.id, workspaceName: workspace.name })
       router.push('/workspace')
       return
     } catch {

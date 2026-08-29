@@ -7,7 +7,7 @@ import { ref, watch } from 'vue'
 
 const props = defineProps<{
   open: boolean
-  workspacePath: string
+  workspaceId: string
   filePath: string
   highlightLine?: number
 }>()
@@ -20,11 +20,11 @@ const html = ref('')
 const loading = ref(false)
 
 async function load(): Promise<void> {
-  if (!props.open || !props.workspacePath || !props.filePath) return
+  if (!props.open || !props.workspaceId || !props.filePath) return
   loading.value = true
   try {
-    const params = new URLSearchParams({ workspace: props.workspacePath, path: props.filePath })
-    const res = await fetch(`/api/file?${params}`)
+    const params = new URLSearchParams({ path: props.filePath })
+    const res = await fetch(`/api/workspaces/${encodeURIComponent(props.workspaceId)}/file?${params}`)
     if (!res.ok) return
     const data = (await res.json()) as { content: string; language: string }
     html.value = await highlightCode(data.content, data.language || languageFromPath(props.filePath))
