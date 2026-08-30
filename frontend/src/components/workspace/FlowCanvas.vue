@@ -101,9 +101,9 @@ function onNodeClick(node: FlowNode): void {
   emit('selectNode', node)
 }
 
-const { renderError, setContainer } = useFlowMermaid(
-  () => props.nodes,
-  () => props.edges,
+const { renderError, setContainer, renderStructural } = useFlowMermaid(
+  () => (props.mappingFullFlow ? [] : props.nodes),
+  () => (props.mappingFullFlow ? [] : props.edges),
   () => props.selectedNodeId,
   onNodeClick,
   () => {
@@ -112,6 +112,14 @@ const { renderError, setContainer } = useFlowMermaid(
       // Default view on each new chart: centred on the top node at current scale
       centerView()
     })
+  },
+)
+
+// When mappingFullFlow clears, do one final render with the complete graph
+watch(
+  () => props.mappingFullFlow,
+  (active) => {
+    if (!active) void renderStructural()
   },
 )
 
@@ -383,7 +391,7 @@ const showExpandHint = computed(
             >
               <p class="text-sm text-slate-300">Mapping full flow for {{ symbol }}...</p>
             </div>
-            <div ref="panContent" class="inline-block min-h-full min-w-full p-4">
+            <div ref="panContent" class="absolute inset-0 p-4">
               <div
                 ref="mermaidContainer"
                 class="mermaid-flow mx-auto flex min-h-[180px] min-w-fit items-center justify-center"

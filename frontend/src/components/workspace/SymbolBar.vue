@@ -66,6 +66,7 @@ function onInputBlur(): void {
     class="symbolbar-wrap"
     :class="visible ? 'symbolbar-visible' : 'symbolbar-hidden'"
   >
+  <div class="symbolbar-inner">
   <div v-if="filePath" class="flex items-center gap-2 border-b border-slate-800 bg-slate-900/80 px-4 py-2">
     <span class="shrink-0 text-xs text-slate-500">Trace</span>
 
@@ -147,21 +148,25 @@ function onInputBlur(): void {
     </div>
   </div>
   </div>
+  </div>
 </template>
 
 <style scoped>
 .symbolbar-wrap {
-  overflow: hidden;
-  transition: max-height 0.22s ease, opacity 0.22s ease;
+  display: grid;
+  transition: grid-template-rows 0.22s ease, opacity 0.22s ease;
 }
 .symbolbar-visible {
-  max-height: 56px;
+  grid-template-rows: 1fr;
   opacity: 1;
 }
 .symbolbar-hidden {
-  max-height: 0;
+  grid-template-rows: 0fr;
   opacity: 0;
   pointer-events: none;
+}
+.symbolbar-inner {
+  overflow: hidden;
 }
 
 .symbol-scroll {

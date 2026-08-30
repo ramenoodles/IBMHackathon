@@ -7,7 +7,6 @@ import { useRouter } from 'vue-router'
 import Sidebar from '@/components/workspace/Sidebar.vue'
 import SymbolBar from '@/components/workspace/SymbolBar.vue'
 import FlowCanvas from '@/components/workspace/FlowCanvas.vue'
-import SymbolLoadPrompt from '@/components/workspace/SymbolLoadPrompt.vue'
 import FlowWarmOverlay from '@/components/workspace/FlowWarmOverlay.vue'
 import BranchPrompt from '@/components/workspace/BranchPrompt.vue'
 import Modal from '@/components/ui/Modal.vue'
@@ -23,7 +22,7 @@ import { useNodeDetail } from '@/composables/useNodeDetail'
 import { userContext, normalizeLanguage } from '@/store/userContext'
 import type { FlowNode } from '@/types/flowGraph'
 
-type WorkspacePhase = 'idle' | 'brief' | 'tracing'
+type WorkspacePhase = 'idle' | 'tracing'
 
 const {
   sidebarOpen,
@@ -121,16 +120,8 @@ async function onSelectFile(path: string): Promise<void> {
   clearDetail()
   resetSymbols()
   resetGraph()
-  workspacePhase.value = 'brief'
+  workspacePhase.value = 'tracing'
   await loadSymbols(userContext.value.workspaceId, path)
-}
-
-function onDeclineFlowInit(): void {
-  workspacePhase.value = 'tracing'
-}
-
-function onConfirmFlowInit(): void {
-  workspacePhase.value = 'tracing'
   const first = currentPageSymbols.value[0]
   if (first) void onPickSymbol(first.name)
 }
@@ -212,7 +203,7 @@ function fileName(): string {
 </script>
 
 <template>
-  <div class="flex h-screen flex-col bg-slate-950">
+  <div class="flex h-screen flex-col overflow-hidden bg-slate-950">
     <header class="flex items-center gap-3 border-b border-slate-800 bg-slate-900 px-4 py-2.5">
       <button
         type="button"
@@ -270,19 +261,8 @@ function fileName(): string {
         />
 
         <Transition name="fade" mode="out-in">
-          <SymbolLoadPrompt
-            v-if="workspacePhase === 'brief' && selectedPath"
-            key="brief"
-            :file-name="fileName()"
-            :loading="symbolsLoading"
-            :error="symbolsError"
-            :symbol-count="symbols.length"
-            @confirm="onConfirmFlowInit"
-            @decline="onDeclineFlowInit"
-          />
-
           <FlowCanvas
-            v-else-if="workspacePhase === 'tracing'"
+            v-if="workspacePhase === 'tracing'"
             key="tracing"
             :nodes="nodes"
             :edges="edges"

@@ -29,6 +29,9 @@ importers:
       '@panzoom/panzoom':
         specifier: ^4.6.2
         version: 4.6.2
+      marked:
+        specifier: ^18.0.11
+        version: 18.0.11
       mermaid:
         specifier: ^11.6.0
         version: 11.17.2
@@ -2153,6 +2156,11 @@ packages:
 
   marked@16.4.2:
     resolution: {integrity: sha512-TI3V8YYWvkVf3KJe1dRkpnjs68JUPyEa5vjKrp1XEEJUAOaQc+Qj+L1qWbPd0SJuAdQkFU0h73sXXqwDYxsiDA==}
+    engines: {node: '>= 20'}
+    hasBin: true
+
+  marked@18.0.11:
+    resolution: {integrity: sha512-HnslJfsZkRPBDJRHvVtAaWlZHEpSu7u8LgQuJCELjRKuWR+hpq4A7sLq3p8HaI9ypVoXDXxV34CsQJEe1+J5Aw==}
     engines: {node: '>= 20'}
     hasBin: true
 
@@ -4800,6 +4808,8 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.6.0
 
   marked@16.4.2: {}
+
+  marked@18.0.11: {}
 
   mdast-util-to-hast@13.2.1:
     dependencies:
