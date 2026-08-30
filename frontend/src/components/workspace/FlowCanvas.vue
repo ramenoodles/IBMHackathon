@@ -72,7 +72,7 @@ const emit = defineEmits<{
   revealNode: [node: FlowNode]
   showFullFlow: []
   requestDetail: [node: FlowNode]
-  viewSource: []
+  viewSource: [file?: string, line?: number]
   goToDefinition: [file: string, line: number]
 }>()
 
@@ -521,7 +521,7 @@ const showExpandHint = computed(
             v-if="selectedNode.file || detail?.file"
             type="button"
             class="text-left text-xs text-slate-400 hover:text-onbober-primary hover:underline"
-            @click="emit('viewSource')"
+            @click="emit('viewSource', selectedNode.file ?? detail?.file, selectedNode.line ?? undefined)"
           >
             View source{{ selectedNode.line ? ` (line ${selectedNode.line})` : '' }}
           </button>
@@ -557,6 +557,14 @@ const showExpandHint = computed(
 .mermaid-flow :deep(svg) {
   max-width: none;
   height: auto;
+}
+
+.mermaid-flow :deep(svg text),
+.mermaid-flow :deep(svg .label),
+.mermaid-flow :deep(svg .nodeLabel),
+.mermaid-flow :deep(svg foreignObject div) {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace !important;
+  font-size: 13px !important;
 }
 
 .mermaid-flow :deep(g.node.is-selected rect),

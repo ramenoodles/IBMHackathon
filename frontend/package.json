@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@monaco-editor/loader": "^1.7.0",
     "@panzoom/panzoom": "^4.6.2",
     "mermaid": "^11.6.0",
     "shiki": "^3.4.0",
