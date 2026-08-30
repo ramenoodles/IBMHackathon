@@ -102,7 +102,17 @@ export const api = {
     return request<FlowGraph>(workspacePath(payload.workspaceId, 'graphs/expand'), jsonBody(payload))
   },
 
-  explain(workspaceId: string, body: { name: string; question: string; language?: string }, signal?: AbortSignal): Promise<NodeDetail> {
+  explain(workspaceId: string, body: {
+    name: string
+    question: string
+    language?: string
+    file?: string
+    line?: number
+    code?: string
+    kind?: string
+    title?: string
+    experience?: string
+  }, signal?: AbortSignal): Promise<NodeDetail> {
     return request<NodeDetail>(workspacePath(workspaceId, 'explain'), { ...jsonBody(body), signal })
   },
 
@@ -116,7 +126,17 @@ export const api = {
     return request<EnrichResult>(workspacePath(workspaceId, 'explain'), jsonBody(body))
   },
 
-  async explainStream(workspaceId: string, body: { name: string; question: string; language?: string }, signal?: AbortSignal): Promise<Response> {
+  async explainStream(workspaceId: string, body: {
+    name: string
+    question: string
+    language?: string
+    file?: string
+    line?: number
+    code?: string
+    kind?: string
+    title?: string
+    experience?: string
+  }, signal?: AbortSignal): Promise<Response> {
     const response = await fetch(workspacePath(workspaceId, 'explain'), { ...jsonBody(body), signal })
     if (!response.ok) {
       let message = `Request failed (${response.status})`

@@ -4,6 +4,7 @@
  */
 import type { FlowEdge, FlowNode, NodeDetail } from '@/types/flowGraph'
 import { computed, nextTick, ref, watch } from 'vue'
+import MarkdownView from '@/components/workspace/MarkdownView.vue'
 import { nodeDisplayTitle, useFlowMermaid } from '@/composables/useFlowMermaid'
 import { useFlowPanZoom } from '@/composables/useFlowPanZoom'
 import { useHorizontalResize } from '@/composables/usePanelResize'
@@ -462,10 +463,8 @@ const showExpandHint = computed(
               <span class="inline-block rounded bg-green-900/40 px-1.5 py-0.5 text-[10px] font-bold uppercase text-green-400">
                 Verified
               </span>
-              <p class="mt-2 text-sm leading-relaxed text-slate-300">
-                {{ verifiedExplanation || detail?.explanation }}
-                <span v-if="detailStreaming && !inferredExplanation" class="inline-block w-1.5 animate-pulse bg-onbober-primary">|</span>
-              </p>
+              <MarkdownView :content="verifiedExplanation || detail?.explanation || ''" class="mt-2" />
+              <span v-if="detailStreaming && !inferredExplanation" class="inline-block w-1.5 animate-pulse bg-onbober-primary">|</span>
             </div>
 
             <div v-if="inferredExplanation" class="mt-4">
@@ -473,10 +472,8 @@ const showExpandHint = computed(
                 Inferred
               </span>
               <p class="mt-1 text-[10px] text-slate-500">Based on codebase patterns — not verified against external API docs.</p>
-              <p class="mt-2 text-sm leading-relaxed text-amber-300/90">
-                {{ inferredExplanation }}
-                <span v-if="detailStreaming" class="inline-block w-1.5 animate-pulse bg-onbober-primary">|</span>
-              </p>
+              <MarkdownView :content="inferredExplanation" class="mt-2 [&_.md-prose]:text-amber-300/90" />
+              <span v-if="detailStreaming" class="inline-block w-1.5 animate-pulse bg-onbober-primary">|</span>
             </div>
 
             <div v-if="hasEvidence" class="mt-4">

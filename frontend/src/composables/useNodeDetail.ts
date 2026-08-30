@@ -100,7 +100,17 @@ export function useNodeDetail() {
     }
 
     try {
-      const parsed = await api.explain(params.workspaceId, { name: params.symbol, question: 'Explain this step.', language: params.language }, signal)
+      const parsed = await api.explain(params.workspaceId, {
+        name: params.symbol,
+        question: '',
+        language: params.language,
+        file: params.file,
+        line: params.line,
+        code: params.code,
+        kind: params.kind,
+        title: params.title,
+        experience: params.experience,
+      }, signal)
       detail.value = { ...detail.value, ...parsed, id: params.nodeId, title: params.title ?? params.nodeId, summary: params.summary ?? '' }
       setCached(params, detail.value)
     } catch (err) {
@@ -115,7 +125,17 @@ export function useNodeDetail() {
 
   async function loadDetailStream(params: NodeDetailParams, signal: AbortSignal): Promise<void> {
     const q = buildQuery(params)
-    const res = await api.explainStream(params.workspaceId, { name: params.symbol, question: 'Explain this step.', language: params.language }, signal)
+    const res = await api.explainStream(params.workspaceId, {
+      name: params.symbol,
+      question: '',
+      language: params.language,
+      file: params.file,
+      line: params.line,
+      code: params.code,
+      kind: params.kind,
+      title: params.title,
+      experience: params.experience,
+    }, signal)
 
     const reader = res.body?.getReader()
     if (!reader) throw new Error('Response body is not readable')

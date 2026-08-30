@@ -239,7 +239,18 @@ func (h *Handler) explain(w http.ResponseWriter, r *http.Request) {
 		fail(w, 503, "Watsonx provider is not configured")
 		return
 	}
-	var in struct{ Name, Question, Language string }
+	var in struct {
+		Name       string `json:"name"`
+		Question   string `json:"question"`
+		Language   string `json:"language"`
+		// Node context — enriches the prompt and lets us skip ripgrep when code is present.
+		File       string `json:"file"`
+		Line       int    `json:"line"`
+		Code       string `json:"code"`
+		Kind       string `json:"kind"`
+		Title      string `json:"title"`
+		Experience string `json:"experience"`
+	}
 	if json.NewDecoder(r.Body).Decode(&in) != nil {
 		fail(w, 400, "invalid JSON")
 		return
@@ -254,7 +265,17 @@ func (h *Handler) explain(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, e.Error())
 		return
 	}
-	res, e := s.Explain(r.Context(), service.ExplainRequest{Name: in.Name, Question: in.Question, Language: in.Language})
+	res, e := s.Explain(r.Context(), service.ExplainRequest{
+		Name:       in.Name,
+		Question:   in.Question,
+		Language:   in.Language,
+		File:       in.File,
+		Line:       in.Line,
+		Code:       in.Code,
+		Kind:       in.Kind,
+		Title:      in.Title,
+		Experience: in.Experience,
+	})
 	if e != nil {
 		fail(w, 500, e.Error())
 		return

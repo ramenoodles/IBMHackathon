@@ -3,6 +3,7 @@
  * Side drawer showing detailed explanation for a selected flow node.
  */
 import type { NodeDetail } from '@/types/flowGraph'
+import MarkdownView from '@/components/workspace/MarkdownView.vue'
 
 defineProps<{
   detail: NodeDetail | null
@@ -44,7 +45,7 @@ const emit = defineEmits<{
           {{ detail.confidence }}
         </span>
         <p class="mt-3 text-slate-300">{{ detail.summary }}</p>
-        <p class="mt-3 leading-relaxed text-slate-400">{{ detail.explanation }}</p>
+        <MarkdownView v-if="detail.explanation" :content="detail.explanation" class="mt-3" />
 
         <div v-if="detail.relatedSymbols?.length" class="mt-4">
           <p class="mb-2 text-xs uppercase text-slate-500">Related</p>

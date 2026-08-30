@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@panzoom/panzoom": "^4.6.2",
+    "marked": "^18.0.11",
     "mermaid": "^11.6.0",
     "shiki": "^3.4.0",
     "vscode-material-icons": "^0.1.1",
