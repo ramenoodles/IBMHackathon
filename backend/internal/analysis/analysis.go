@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	MaxRootNodes   = 8
-	MaxExpandNodes = 6
-	MaxDepth       = 4
+	MaxRootNodes   = 50
+	MaxExpandNodes = 30
+	MaxDepth       = 8
 )
 
 type Node struct {
