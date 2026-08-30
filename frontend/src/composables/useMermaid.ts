@@ -18,7 +18,7 @@ function ensureMermaidInit(): void {
     },
     themeVariables: {
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace",
-      fontSize: '13px',
+      fontSize: '15px',
     },
   })
   initialized = true

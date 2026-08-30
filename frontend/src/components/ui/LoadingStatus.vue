@@ -17,7 +17,7 @@ const props = withDefaults(
   {
     showShimmer: true,
     showProgressBar: false,
-    phraseClass: 'text-[11px] italic text-slate-500',
+    phraseClass: 'text-xs italic text-slate-400',
   },
 )
 

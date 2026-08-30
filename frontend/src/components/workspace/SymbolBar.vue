@@ -67,8 +67,8 @@ function onInputBlur(): void {
     :class="visible ? 'symbolbar-visible' : 'symbolbar-hidden'"
   >
   <div class="symbolbar-inner">
-  <div v-if="filePath" class="flex items-center gap-2 border-b border-slate-800 bg-slate-900/80 px-4 py-2">
-    <span class="shrink-0 text-xs text-slate-500">Trace</span>
+  <div v-if="filePath" class="flex items-center gap-2 border-b border-slate-800 bg-slate-900/80 px-4 py-2.5">
+    <span class="shrink-0 text-sm font-medium text-slate-400">Trace</span>
 
     <!-- Symbol buttons -->
     <div class="symbol-scroll flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-0.5">
@@ -76,7 +76,7 @@ function onInputBlur(): void {
         v-for="fn in symbolNames"
         :key="fn"
         type="button"
-        class="shrink-0 rounded-md px-3 py-1 text-xs font-medium transition"
+        class="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition"
         :class="
           activeSymbol === fn
             ? 'bg-onbober-primary text-white'
@@ -86,7 +86,7 @@ function onInputBlur(): void {
       >
         {{ fn }}
       </button>
-      <span v-if="!symbolNames?.length" class="text-xs text-slate-500">No symbols on this page</span>
+      <span v-if="!symbolNames?.length" class="text-sm text-slate-500">No symbols on this page</span>
     </div>
 
     <!-- Pagination control -->
@@ -94,7 +94,7 @@ function onInputBlur(): void {
       <!-- Prev arrow -->
       <button
         type="button"
-        class="rounded px-1.5 py-0.5 text-xs text-slate-400 transition disabled:cursor-not-allowed disabled:opacity-30 hover:enabled:bg-slate-700 hover:enabled:text-slate-200"
+        class="rounded px-2 py-1 text-sm text-slate-400 transition disabled:cursor-not-allowed disabled:opacity-30 hover:enabled:bg-slate-700 hover:enabled:text-slate-200"
         :disabled="!hasPrevPage"
         title="Previous page"
         @click="emit('prevPage')"
@@ -107,7 +107,7 @@ function onInputBlur(): void {
         v-for="p in pageWindow"
         :key="p"
         type="button"
-        class="min-w-[22px] rounded px-1.5 py-0.5 text-xs font-medium transition"
+        class="min-w-[26px] rounded px-2 py-1 text-sm font-medium transition"
         :class="
           p === page
             ? 'bg-onbober-primary text-white'
@@ -122,7 +122,7 @@ function onInputBlur(): void {
       <!-- Next arrow -->
       <button
         type="button"
-        class="rounded px-1.5 py-0.5 text-xs text-slate-400 transition disabled:cursor-not-allowed disabled:opacity-30 hover:enabled:bg-slate-700 hover:enabled:text-slate-200"
+        class="rounded px-2 py-1 text-sm text-slate-400 transition disabled:cursor-not-allowed disabled:opacity-30 hover:enabled:bg-slate-700 hover:enabled:text-slate-200"
         :disabled="!hasNextPage"
         title="Next page"
         @click="emit('nextPage')"
@@ -138,7 +138,7 @@ function onInputBlur(): void {
         v-model="inputValue"
         type="text"
         inputmode="numeric"
-        class="w-8 rounded border border-slate-700 bg-slate-800 px-1 py-0.5 text-center text-xs text-slate-300 outline-none transition focus:border-onbober-primary focus:text-white"
+        class="w-9 rounded border border-slate-700 bg-slate-800 px-1 py-1 text-center text-sm text-slate-300 outline-none transition focus:border-onbober-primary focus:text-white"
         :placeholder="`${page + 1}`"
         title="Go to page"
         @focus="inputFocused = true"

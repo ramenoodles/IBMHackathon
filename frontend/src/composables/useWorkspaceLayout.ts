@@ -7,12 +7,12 @@ const codeDrawerOpen = ref(false)
 const isMobile = ref(false)
 
 const explorerWidth = ref(176)
-const traceWidth = ref(288)
-const detailWidth = ref(288)
+const traceWidth = ref(320)
+const detailWidth = ref(320)
 
 const EXPLORER_MIN = 140
 const EXPLORER_MAX = 400
-const TRACE_MIN = 200
+const TRACE_MIN = 240
 const TRACE_MAX = 480
 const DETAIL_MIN = 240
 const DETAIL_MAX = 520
