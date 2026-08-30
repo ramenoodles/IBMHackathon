@@ -275,11 +275,11 @@ func classifyLine(line bodyLine) (flowStep, bool) {
 		}
 		return newStep(line, kind, shorten(clean, 44), "Exit the function", "", ""), true
 	}
-	if assignPattern.MatchString(clean) {
-		return newStep(line, "assign", shorten(clean, 44), "Assign: "+shorten(clean, 60), "", ""), true
-	}
 	if callee, qualified := primaryCallee(clean); callee != "" {
 		return newStep(line, "call", qualified+"()", "Calls "+strings.ReplaceAll(callee, "_", " "), "", callee), true
+	}
+	if assignPattern.MatchString(clean) {
+		return newStep(line, "assign", shorten(clean, 44), "Assign: "+shorten(clean, 60), "", ""), true
 	}
 	return flowStep{}, false
 }
@@ -307,7 +307,17 @@ func primaryCallee(line string) (string, string) {
 
 func noiseCallee(name string) bool {
 	switch name {
+	// Go / Python builtins
 	case "if", "for", "while", "switch", "return", "len", "str", "int", "dict", "list", "range", "type", "set", "append", "make", "new", "delete", "panic", "print", "println":
+		return true
+	// JS/TS constructors — upper-case constructor names that appear on the RHS
+	// of declarations (new Set(), new Map(), new Array(), …) and carry no
+	// interesting call semantics of their own.
+	case "Set", "Map", "Array", "Object", "Promise", "Error", "WeakMap", "WeakSet", "WeakRef", "Date", "RegExp", "URL", "URLSearchParams":
+		return true
+	// Vue / reactive primitives — these are type-wrapper calls, not
+	// meaningful domain calls (ref<T>(), reactive<T>(), computed(() => …), …).
+	case "ref", "reactive", "computed", "watch", "watchEffect", "readonly", "shallowRef", "shallowReactive", "toRef", "toRefs", "markRaw", "triggerRef":
 		return true
 	}
 	return false
