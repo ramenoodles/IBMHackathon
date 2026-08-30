@@ -190,7 +190,10 @@ async function nextStep(): Promise<void> {
       } else if (sourceTab.value === 'zip' && zipFile.value) {
         workspace = await setupZip(zipFile.value)
       }
-      if (!workspace) return
+      if (!workspace) {
+        setupAnimating.value = false
+        return
+      }
 
       if (withBeaver) {
         const elapsed = performance.now() - startedAt
@@ -199,11 +202,8 @@ async function nextStep(): Promise<void> {
       }
 
       updateUserContext({ workspaceId: workspace.id, workspaceName: workspace.name })
-      router.push('/workspace')
-      return
+      await router.push('/workspace')
     } catch {
-      return
-    } finally {
       setupAnimating.value = false
     }
   }
