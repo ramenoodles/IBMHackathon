@@ -5,6 +5,8 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import LoadingStatus from '@/components/ui/LoadingStatus.vue'
+import logo from '@/assets/logo.png'
 import {
   type ExperienceLevel,
   updateUserContext,
@@ -14,6 +16,12 @@ import {
   type WorkspaceSource,
   useWorkspaceSetup,
 } from '@/composables/useWorkspaceSetup'
+import {
+  GITHUB_SETUP_PHRASES,
+  LOCAL_SETUP_PHRASES,
+  WORKSPACE_SETUP_PHRASES,
+  ZIP_SETUP_PHRASES,
+} from '@/constants/workspaceSetupPhrases'
 
 const router = useRouter()
 const { loading, error, setupLocal, setupGitHub, setupZip } = useWorkspaceSetup()
@@ -108,6 +116,20 @@ const sourceOptions: { value: WorkspaceSource; label: string }[] = [
   { value: 'zip', label: 'Upload ZIP' },
 ]
 
+const setupPhrases = computed(() => {
+  if (sourceTab.value === 'zip') return ZIP_SETUP_PHRASES
+  if (sourceTab.value === 'github') return GITHUB_SETUP_PHRASES
+  if (sourceTab.value === 'local') return LOCAL_SETUP_PHRASES
+  return WORKSPACE_SETUP_PHRASES
+})
+
+const setupSourceLabel = computed(() => {
+  if (sourceTab.value === 'zip' && zipFile.value) return zipFile.value.name
+  if (sourceTab.value === 'github' && githubUrl.value.trim()) return githubUrl.value.trim()
+  if (sourceTab.value === 'local' && localPath.value.trim()) return localPath.value.trim()
+  return ''
+})
+
 const canProceed = computed(() => {
   if (step.value === 1) return selectedLangLabels.value.size > 0
   if (step.value === 2) return Boolean(selectedLevel.value)
@@ -161,6 +183,14 @@ function prevStep(): void {
 <template>
   <div class="flex min-h-screen items-center justify-center bg-slate-950 px-6">
     <div class="w-full max-w-lg rounded-xl border border-slate-800 bg-slate-900 p-8">
+      <div class="mb-6 flex justify-center">
+        <img
+          :src="logo"
+          alt="OnBober mascot"
+          class="h-24 w-auto transition-opacity"
+          :class="loading ? 'animate-pulse' : ''"
+        />
+      </div>
       <p class="mb-2 text-sm text-onbober-primary">Step {{ step }} of {{ totalSteps }}</p>
 
       <div v-if="step === 1">
@@ -232,67 +262,84 @@ function prevStep(): void {
       </div>
 
       <div v-else>
-        <h2 class="mb-2 text-2xl font-bold text-white">Where is your codebase?</h2>
-        <p class="mb-4 text-slate-400">
-          Point to a local folder, paste a GitHub link, or upload a zip archive.
-        </p>
+        <template v-if="loading">
+          <h2 class="mb-2 text-2xl font-bold text-white">Setting up your workspace</h2>
+          <p class="mb-6 text-slate-400">This may take a moment for larger archives.</p>
+          <div class="rounded-lg border border-slate-800 bg-slate-950 px-6 py-8">
+            <p v-if="setupSourceLabel" class="mb-4 truncate text-center font-mono text-sm text-slate-400">
+              {{ setupSourceLabel }}
+            </p>
+            <div class="flex justify-center">
+              <LoadingStatus
+                :active="true"
+                :phrases="setupPhrases"
+                :show-shimmer="false"
+                phrase-class="text-sm text-slate-400"
+              />
+            </div>
+          </div>
+        </template>
 
-        <div class="mb-4 flex gap-2">
-          <button
-            v-for="opt in sourceOptions"
-            :key="opt.value"
-            type="button"
-            class="flex-1 rounded-lg border px-3 py-2 text-sm transition"
-            :class="
-              sourceTab === opt.value
-                ? 'border-onbober-primary bg-onbober-primary/10 text-white'
-                : 'border-slate-700 text-slate-400 hover:border-slate-500'
-            "
-            @click="sourceTab = opt.value"
-          >
-            {{ opt.label }}
-          </button>
-        </div>
-
-        <div v-if="sourceTab === 'local'">
-          <input
-            v-model="localPath"
-            type="text"
-            placeholder="C:\codebases\linux"
-            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-onbober-primary focus:outline-none"
-          />
-          <p class="mt-2 text-xs text-slate-500">Absolute path to an existing folder on your machine.</p>
-        </div>
-
-        <div v-else-if="sourceTab === 'github'">
-          <input
-            v-model="githubUrl"
-            type="text"
-            placeholder="https://github.com/torvalds/linux"
-            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-onbober-primary focus:outline-none"
-          />
-          <p class="mt-2 text-xs text-slate-500">
-            Public repos only. Shallow clone — requires git on the server machine.
+        <template v-else>
+          <h2 class="mb-2 text-2xl font-bold text-white">Where is your codebase?</h2>
+          <p class="mb-4 text-slate-400">
+            Point to a local folder, paste a GitHub link, or upload a zip archive.
           </p>
-        </div>
 
-        <div v-else>
-          <label
-            class="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-700 bg-slate-950 px-4 py-8 transition hover:border-onbober-primary"
-          >
-            <span class="mb-2 text-3xl">📦</span>
-            <span class="text-sm text-slate-300">
-              {{ zipFile ? zipFile.name : 'Click to choose a .zip file' }}
-            </span>
-            <span class="mt-1 text-xs text-slate-500">Max 200 MB</span>
-            <input type="file" accept=".zip" class="hidden" @change="onZipChange" />
-          </label>
-        </div>
+          <div class="mb-4 flex gap-2">
+            <button
+              v-for="opt in sourceOptions"
+              :key="opt.value"
+              type="button"
+              class="flex-1 rounded-lg border px-3 py-2 text-sm transition"
+              :class="
+                sourceTab === opt.value
+                  ? 'border-onbober-primary bg-onbober-primary/10 text-white'
+                  : 'border-slate-700 text-slate-400 hover:border-slate-500'
+              "
+              @click="sourceTab = opt.value"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+
+          <div v-if="sourceTab === 'local'">
+            <input
+              v-model="localPath"
+              type="text"
+              placeholder="C:\codebases\linux"
+              class="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-onbober-primary focus:outline-none"
+            />
+            <p class="mt-2 text-xs text-slate-500">Absolute path to an existing folder on your machine.</p>
+          </div>
+
+          <div v-else-if="sourceTab === 'github'">
+            <input
+              v-model="githubUrl"
+              type="text"
+              placeholder="https://github.com/torvalds/linux"
+              class="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-onbober-primary focus:outline-none"
+            />
+            <p class="mt-2 text-xs text-slate-500">
+              Public repos only. Shallow clone — requires git on the server machine.
+            </p>
+          </div>
+
+          <div v-else>
+            <label
+              class="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-700 bg-slate-950 px-4 py-8 transition hover:border-onbober-primary"
+            >
+              <span class="mb-2 text-3xl">📦</span>
+              <span class="text-sm text-slate-300">
+                {{ zipFile ? zipFile.name : 'Click to choose a .zip file' }}
+              </span>
+              <span class="mt-1 text-xs text-slate-500">Max 200 MB</span>
+              <input type="file" accept=".zip" class="hidden" @change="onZipChange" />
+            </label>
+          </div>
+        </template>
 
         <p v-if="error" class="mt-3 text-sm text-red-400">{{ error }}</p>
-        <p v-if="loading" class="mt-3 text-sm text-onbober-primary">
-          {{ sourceTab === 'github' ? 'Cloning repository...' : sourceTab === 'zip' ? 'Extracting archive...' : 'Validating path...' }}
-        </p>
       </div>
 
       <div class="mt-8 flex justify-between">

@@ -54,14 +54,15 @@ func (w *WatsonxClient) AskAgent(
 	messages := []wx.ChatMessage{
 		wx.CreateSystemMessage(
 			"You are a software engineering assistant. " +
-				"Answer questions using the provided source code. " +
-				"Be precise and concise.",
+				"Answer ONLY the question asked — do not summarise the whole file or list unrelated functions. " +
+				"Be direct and brief: 2–4 sentences maximum unless the question explicitly asks for more detail. " +
+				"No preamble, no headers, no bullet-point overviews of the whole codebase.",
 		),
 		stringMessage(wx.RoleUser,
 			fmt.Sprintf(
-				"Question:\n%s\n\nSource code:\n%s",
-				question,
+				"Source code:\n```\n%s\n```\n\nQuestion: %s",
 				source,
+				question,
 			),
 		),
 	}

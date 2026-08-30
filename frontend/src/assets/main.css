@@ -4,6 +4,19 @@
   --color-onbober-primary: #ff3366;
   --color-onbober-surface: #0f172a;
   --color-onbober-panel: #1e293b;
+
+  --animate-shimmer: shimmer 1.5s ease-in-out infinite;
+  --animate-blink: blink 1s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
 }
 
 html,

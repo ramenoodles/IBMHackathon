@@ -78,14 +78,14 @@ func buildQuestion(req ExplainRequest) string {
 		fmt.Fprintf(&b, "The exact code at this step is:\n```\n%s\n```", strings.TrimSpace(req.Code))
 	}
 
-	// Experience calibration
+	// Experience calibration — all variants demand brevity.
 	switch req.Experience {
 	case "junior":
-		b.WriteString("\n\nExplain this step clearly for a junior developer — define any non-obvious concepts.")
+		b.WriteString("\n\nIn 2–3 sentences, explain what this single step does. Define any non-obvious concept briefly.")
 	case "senior":
-		b.WriteString("\n\nExplain this step concisely for a senior developer — focus on intent and edge cases only.")
+		b.WriteString("\n\nIn 1–2 sentences, explain the intent of this step and any non-obvious edge case.")
 	default:
-		b.WriteString("\n\nExplain what this specific step does, why it exists, and what happens if it fails or is skipped.")
+		b.WriteString("\n\nIn 2–3 sentences, explain what this step does and why it matters. Do not describe the rest of the file.")
 	}
 
 	return b.String()

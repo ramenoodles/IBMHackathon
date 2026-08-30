@@ -5,11 +5,13 @@
 import type { FlowEdge, FlowNode, NodeDetail } from '@/types/flowGraph'
 import { computed, nextTick, ref, watch } from 'vue'
 import MarkdownView from '@/components/workspace/MarkdownView.vue'
+import LoadingStatus from '@/components/ui/LoadingStatus.vue'
 import { nodeDisplayTitle, useFlowMermaid } from '@/composables/useFlowMermaid'
 import { useFlowPanZoom } from '@/composables/useFlowPanZoom'
 import { useHorizontalResize } from '@/composables/usePanelResize'
 import { useWorkspaceLayout } from '@/composables/useWorkspaceLayout'
 import ResizeHandle from '@/components/ui/ResizeHandle.vue'
+import { AI_LOADING_PHRASES } from '@/constants/aiLoadingPhrases'
 import { edgeOrder } from '@/utils/flowGraphUtils'
 
 const {
@@ -172,6 +174,10 @@ const inferredExplanation = computed(
   () => props.detail?.inferredExplanation?.trim() || '',
 )
 const hasEvidence = computed(() => (props.detail?.evidence?.length ?? 0) > 0)
+
+const showDetailLoading = computed(
+  () => props.detailLoading && !props.detail?.explanation && !verifiedExplanation.value,
+)
 
 function kindLabel(kind: string): string {
   const labels: Record<string, string> = {
@@ -451,9 +457,11 @@ const showExpandHint = computed(
             <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-400">
               Deep dive
             </span>
-            <p v-if="detailLoading && !detail?.explanation && !verifiedExplanation" class="mt-2 text-sm text-slate-500">
-              Generating explanation...
-            </p>
+            <LoadingStatus
+              class="mt-3"
+              :active="showDetailLoading"
+              :phrases="AI_LOADING_PHRASES"
+            />
             <p v-if="detailError" class="mt-2 text-sm text-red-400">{{ detailError }}</p>
             <p v-if="detail?.mock" class="mt-2 rounded border border-amber-800/50 bg-amber-900/20 px-2 py-1 text-xs text-amber-300">
               Watsonx explanation unavailable
