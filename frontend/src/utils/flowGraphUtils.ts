@@ -38,7 +38,7 @@ export const ENRICHMENT_HORIZON_DEPTH = 2
 export const WARM_REVEAL_COUNT = INITIAL_VISIBLE_COUNT
 
 export function cacheKey(filePath: string, symbol: string): string {
-  return `${filePath}::${symbol}`
+  return `v3::${filePath}::${symbol}`
 }
 
 export function edgeOrder(label?: string): number {

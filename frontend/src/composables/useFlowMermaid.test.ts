@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { compileToMermaid } from '@/composables/useFlowMermaid'
+import { compileToMermaid, graphLabelKey, graphStructureKey, nodeMermaidClasses } from '@/composables/useFlowMermaid'
 import type { FlowNode } from '@/types/flowGraph'
 
 const baseNode = (id: string, overrides: Partial<FlowNode> = {}): FlowNode => ({
@@ -20,6 +20,40 @@ describe('compileToMermaid', () => {
     const code = compileToMermaid(nodes, [{ from: 'a', to: 'b' }])
     expect(code).not.toContain('selected')
     expect(code).toContain('classDef verified')
+  })
+
+  it('does not append child count suffix on collapsed nodes', () => {
+    const nodes = [
+      baseNode('a', {
+        title: 'Initialize Topic Configuration',
+        collapsed: true,
+        expandable: true,
+        childCount: 1,
+      }),
+    ]
+    const code = compileToMermaid(nodes, [])
+    expect(code).toContain('Initialize Topic Configuration')
+    expect(code).not.toMatch(/\(\+\d+\)/)
+    expect(code).toContain('collapsed')
+  })
+
+  it('maps labelSource to mermaid classes', () => {
+    expect(nodeMermaidClasses(baseNode('a'))).toEqual(['verified'])
+    expect(nodeMermaidClasses(baseNode('a', { labelSource: 'ai' }))).toEqual(['inferred'])
+    expect(nodeMermaidClasses(baseNode('a', { labelSource: 'heuristic' }))).toEqual(['heuristic'])
+    expect(nodeMermaidClasses(baseNode('a', { labelSource: 'ai', collapsed: true }))).toEqual(['collapsed'])
+  })
+
+  it('separates structure and label keys', () => {
+    const nodes = [baseNode('a', { title: 'One' }), baseNode('b', { kind: 'branch' })]
+    const edges = [{ from: 'a', to: 'b' }]
+    const structure = graphStructureKey(nodes, edges)
+    expect(graphStructureKey(nodes, edges)).toBe(structure)
+    expect(graphLabelKey(nodes)).toContain('One')
+
+    const relabeled = [baseNode('a', { title: 'Two' }), baseNode('b', { kind: 'branch' })]
+    expect(graphStructureKey(relabeled, edges)).toBe(structure)
+    expect(graphLabelKey(relabeled)).not.toBe(graphLabelKey(nodes))
   })
 })
 

@@ -25,32 +25,23 @@ const MERMAID_RESERVED = new Set([
 ])
 
 const STRUCTURAL_RENDER_DEBOUNCE_MS = 75
+const MERMAID_STYLE_CLASSES = ['verified', 'inferred', 'heuristic', 'collapsed'] as const
+
+export type FlowRenderReason = 'structure' | 'label'
 
 /**
  * Escape text for Mermaid quoted node labels ("...").
- * Inside a double-quoted label the only characters that break parsing are
- * double-quotes (which close the string) and raw newlines.
- * Everything else — <, >, [, ], #, ; — is safe to pass through as-is.
- * @param text - Raw label text.
  */
 export function escapeMermaidLabel(text: string): string {
   return text
-    .replace(/\r?\n/g, ' ')    // collapse newlines to a space
-    .replace(/"/g, "'")         // swap " for ' to avoid closing the label string
+    .replace(/\r?\n/g, ' ')
+    .replace(/"/g, "'")
 }
 
-/**
- * Build stable numeric Mermaid node ids (avoids reserved words like `if`).
- * @param index - Node index in the graph list.
- */
 export function mermaidNodeId(index: number): string {
   return `n${index}`
 }
 
-/**
- * Legacy sanitizer kept for click-handler matching on older SVG ids.
- * @param id - Raw node id.
- */
 export function mermaidId(id: string): string {
   const base = id.replace(/[^a-zA-Z0-9_]/g, '_')
   if (!base || MERMAID_RESERVED.has(base.toLowerCase()) || /^\d/.test(base)) {
@@ -59,9 +50,6 @@ export function mermaidId(id: string): string {
   return base
 }
 
-/**
- * Plain label for graph boxes — prefer LLM title, never raw code literals.
- */
 export function nodeDisplayTitle(node: FlowNode): string {
   if (node.title) return node.title
   const s = node.summary?.trim()
@@ -73,10 +61,34 @@ function looksLikeCode(text: string): boolean {
   return /[{}"'`;=]/.test(text) || text.startsWith('return ')
 }
 
-/**
- * Compile flow graph nodes and edges into Mermaid flowchart syntax.
- * Selection highlighting is applied via DOM after render — not in DSL.
- */
+export function nodeMermaidClasses(node: FlowNode): string[] {
+  if (node.collapsed) return ['collapsed']
+  switch (node.labelSource) {
+    case 'ai':
+      return ['inferred']
+    case 'heuristic':
+      return ['heuristic']
+    default:
+      return ['verified']
+  }
+}
+
+/** Stable key for graph topology — ids, kinds, compact state, edges. */
+export function graphStructureKey(nodes: FlowNode[], edges: FlowEdge[]): string {
+  const nodePart = nodes
+    .map((n) => `${n.id}:${n.kind}:${n.collapsed ? 1 : 0}`)
+    .join('|')
+  const edgePart = edges.map((e) => `${e.from}->${e.to}:${e.label ?? ''}`).join('|')
+  return `${nodePart};;${edgePart}`
+}
+
+/** Stable key for display labels only. */
+export function graphLabelKey(nodes: FlowNode[]): string {
+  return nodes
+    .map((n) => `${n.id}:${nodeDisplayTitle(n)}:${n.labelSource ?? 'scan'}`)
+    .join('|')
+}
+
 export function compileToMermaid(nodes: FlowNode[], edges: FlowEdge[]): string {
   if (nodes.length === 0) return ''
 
@@ -86,23 +98,21 @@ export function compileToMermaid(nodes: FlowNode[], edges: FlowEdge[]): string {
     'flowchart TD',
     'classDef verified fill:#1a2e1a,stroke:#4ade80,color:#e2e8f0',
     'classDef inferred fill:#2a1f0a,stroke:#fbbf24,color:#e2e8f0,stroke-dasharray:5 5',
+    'classDef heuristic fill:#0c2a2e,stroke:#22d3ee,color:#e2e8f0',
     'classDef collapsed fill:#1e293b,stroke:#ff3366,color:#f8fafc',
   ]
 
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i]!
     const mid = mermaidNodeId(i)
-    const display = nodeDisplayTitle(node)
-    const label = node.collapsed ? `${display} (+${node.childCount})` : display
-    const safe = escapeMermaidLabel(label)
+    const safe = escapeMermaidLabel(nodeDisplayTitle(node))
     if (node.kind === 'branch') {
       lines.push(`  ${mid}{"${safe}"}`)
     } else {
       lines.push(`  ${mid}["${safe}"]`)
     }
 
-    const classes: string[] = [node.confidence]
-    if (node.collapsed) classes.push('collapsed')
+    const classes = nodeMermaidClasses(node)
     lines.push(`  class ${mid} ${classes.join(',')}`)
   }
 
@@ -137,9 +147,35 @@ function findNodeGroup(container: HTMLElement, nodes: FlowNode[], nodeId: string
   return null
 }
 
+function applyNodeStyleClasses(group: SVGGElement, classes: string[]): void {
+  const targets = [group, ...group.querySelectorAll('rect, polygon, path, circle, ellipse')]
+  for (const el of targets) {
+    for (const cls of MERMAID_STYLE_CLASSES) el.classList.remove(cls)
+    for (const cls of classes) el.classList.add(cls)
+  }
+}
+
 /**
- * Highlight the selected node in the rendered SVG without re-rendering Mermaid.
+ * Update box labels and style classes without re-running Mermaid.
  */
+export function applyLabelPatches(container: HTMLElement | null, nodes: FlowNode[]): void {
+  if (!container) return
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i]!
+    const group = container.querySelector<SVGGElement>(`g[id^="flowchart-n${i}-"]`)
+    if (!group) continue
+
+    const title = nodeDisplayTitle(node)
+    const labelEl =
+      group.querySelector<HTMLElement>('.nodeLabel') ??
+      group.querySelector<HTMLElement>('foreignObject div') ??
+      group.querySelector<HTMLElement>('.label')
+    if (labelEl) labelEl.textContent = title
+
+    applyNodeStyleClasses(group, nodeMermaidClasses(node))
+  }
+}
+
 export function applySelectionHighlight(
   container: HTMLElement | null,
   nodes: FlowNode[],
@@ -154,9 +190,6 @@ export function applySelectionHighlight(
   group?.classList.add('is-selected')
 }
 
-/**
- * Wire click handlers on rendered Mermaid node groups.
- */
 function attachNodeClicks(
   container: HTMLElement,
   nodes: FlowNode[],
@@ -185,20 +218,19 @@ function bindClick(
   }
 }
 
-/**
- * Reactive Mermaid renderer for flow graphs with node click support.
- */
 export function useFlowMermaid(
   nodes: MaybeRefOrGetter<FlowNode[]>,
   edges: MaybeRefOrGetter<FlowEdge[]>,
   selectedNodeId: MaybeRefOrGetter<string> = '',
   onNodeClick?: (node: FlowNode) => void,
-  onStructuralRender?: () => void,
+  onRender?: (reason: FlowRenderReason) => void,
 ) {
   const mermaidCode = ref('')
   const renderError = ref<string | null>(null)
   const containerRef = ref<HTMLElement | null>(null)
   let structuralTimer: ReturnType<typeof setTimeout> | null = null
+  let lastStructureKey = ''
+  let lastLabelKey = ''
 
   async function renderStructural(): Promise<void> {
     const nodeList = toValue(nodes)
@@ -210,7 +242,7 @@ export function useFlowMermaid(
       await renderMermaid(containerRef.value, mermaidCode.value)
       if (onNodeClick) attachNodeClicks(containerRef.value, nodeList, onNodeClick)
       applySelectionHighlight(containerRef.value, nodeList, toValue(selectedNodeId))
-      onStructuralRender?.()
+      onRender?.('structure')
     } catch (err) {
       renderError.value = err instanceof Error ? err.message : 'Render failed'
     }
@@ -224,10 +256,31 @@ export function useFlowMermaid(
     }, STRUCTURAL_RENDER_DEBOUNCE_MS)
   }
 
+  function syncFromGraph(): void {
+    const nodeList = toValue(nodes)
+    const edgeList = toValue(edges)
+    const structureKey = graphStructureKey(nodeList, edgeList)
+    const labelKey = graphLabelKey(nodeList)
+
+    if (structureKey !== lastStructureKey) {
+      lastStructureKey = structureKey
+      lastLabelKey = labelKey
+      scheduleStructuralRender()
+      return
+    }
+
+    if (labelKey !== lastLabelKey) {
+      lastLabelKey = labelKey
+      applyLabelPatches(containerRef.value, nodeList)
+      applySelectionHighlight(containerRef.value, nodeList, toValue(selectedNodeId))
+      onRender?.('label')
+    }
+  }
+
   watch(
     [() => toValue(nodes), () => toValue(edges)],
     () => {
-      scheduleStructuralRender()
+      syncFromGraph()
     },
     { deep: true },
   )
@@ -242,8 +295,15 @@ export function useFlowMermaid(
 
   function setContainer(el: HTMLElement | null): void {
     containerRef.value = el
+    lastStructureKey = ''
+    lastLabelKey = ''
     void renderStructural()
   }
 
-  return { mermaidCode, renderError, setContainer, renderStructural }
+  function resetKeys(): void {
+    lastStructureKey = ''
+    lastLabelKey = ''
+  }
+
+  return { mermaidCode, renderError, setContainer, renderStructural, resetKeys }
 }

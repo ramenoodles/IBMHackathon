@@ -9,10 +9,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
+
+var githubShorthandPattern = regexp.MustCompile(`^[\w.-]+/[\w.-]+$`)
 
 type Workspace struct {
 	ID, Name, Source string
@@ -75,20 +78,59 @@ func (m *Manager) Local(path string) (Workspace, error) {
 	}
 	return m.add(path, filepath.Base(path), "local", false)
 }
+func normalizeGitHubURL(raw string) (string, error) {
+	url := strings.TrimSpace(raw)
+	if url == "" {
+		return "", fmt.Errorf("repository URL is required")
+	}
+	url = strings.TrimSuffix(url, "/")
+	url = strings.TrimSuffix(url, ".git")
+
+	lower := strings.ToLower(url)
+	switch {
+	case githubShorthandPattern.MatchString(url):
+		url = "https://github.com/" + url
+	case strings.HasPrefix(lower, "https://github.com/"), strings.HasPrefix(lower, "http://github.com/"):
+		// already a full URL
+	case strings.HasPrefix(lower, "github.com/"):
+		url = "https://" + url
+	case strings.HasPrefix(lower, "www.github.com/"):
+		url = "https://" + url[len("www."):]
+	default:
+		return "", fmt.Errorf("invalid GitHub repository: use owner/repo or a github.com URL")
+	}
+
+	if !strings.HasPrefix(strings.ToLower(url), "https://github.com/") &&
+		!strings.HasPrefix(strings.ToLower(url), "http://github.com/") {
+		return "", fmt.Errorf("invalid GitHub repository: use owner/repo or a github.com URL")
+	}
+	return url, nil
+}
+
+func githubRepoName(cloneURL string) string {
+	trimmed := strings.TrimSuffix(strings.TrimSpace(cloneURL), "/")
+	trimmed = strings.TrimSuffix(trimmed, ".git")
+	if i := strings.LastIndex(trimmed, "/"); i >= 0 && i < len(trimmed)-1 {
+		return trimmed[i+1:]
+	}
+	return filepath.Base(trimmed)
+}
+
 func (m *Manager) GitHub(ctx context.Context, url string) (Workspace, error) {
-	if strings.TrimSpace(url) == "" {
-		return Workspace{}, fmt.Errorf("repository URL is required")
+	cloneURL, err := normalizeGitHubURL(url)
+	if err != nil {
+		return Workspace{}, err
 	}
 	dir, err := os.MkdirTemp(m.tempRoot, "git-")
 	if err != nil {
 		return Workspace{}, err
 	}
-	cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", url, dir)
+	cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", cloneURL, dir)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		_ = os.RemoveAll(dir)
 		return Workspace{}, fmt.Errorf("clone repository: %s", strings.TrimSpace(string(out)))
 	}
-	return m.add(dir, filepath.Base(strings.TrimSuffix(url, "/")), "github", true)
+	return m.add(dir, githubRepoName(cloneURL), "github", true)
 }
 func (m *Manager) Zip(file io.Reader, name string, size int64) (Workspace, error) {
 	if size > 200<<20 {

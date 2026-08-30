@@ -32,3 +32,8 @@ type AgentClient interface {
 		source string,
 	) (AgentResponse, error)
 }
+
+// EnrichClient labels flow-graph nodes in batch for onboarding display.
+type EnrichClient interface {
+	EnrichBatch(ctx context.Context, prompt string) (string, error)
+}

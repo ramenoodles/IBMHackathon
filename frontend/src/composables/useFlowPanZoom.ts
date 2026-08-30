@@ -1,6 +1,12 @@
 import Panzoom, { type PanzoomObject } from '@panzoom/panzoom'
 import { onUnmounted, ref, type Ref } from 'vue'
 
+export interface FlowViewport {
+  x: number
+  y: number
+  scale: number
+}
+
 /**
  * Pan/zoom viewport for large Mermaid flowcharts.
  */
@@ -31,7 +37,6 @@ export function useFlowPanZoom(viewportRef: Ref<HTMLElement | null>, contentRef:
       instance.zoomWithWheel(e)
     }
     viewport.addEventListener('wheel', onWheel)
-    // Store the handler so unbind can remove it
     ;(viewport as HTMLElement & { _panzoomWheel?: (e: WheelEvent) => void })._panzoomWheel = onWheel
   }
 
@@ -61,6 +66,20 @@ export function useFlowPanZoom(viewportRef: Ref<HTMLElement | null>, contentRef:
     panzoom.value?.reset()
   }
 
+  function getViewport(): FlowViewport | null {
+    const instance = panzoom.value
+    if (!instance) return null
+    const pan = instance.getPan()
+    return { x: pan.x, y: pan.y, scale: instance.getScale() }
+  }
+
+  function setViewport(viewport: FlowViewport): void {
+    const instance = panzoom.value
+    if (!instance) return
+    instance.zoom(viewport.scale, { animate: false })
+    instance.pan(viewport.x, viewport.y, { animate: false })
+  }
+
   function centerView(): void {
     const viewport = viewportRef.value
     const content = contentRef.value
@@ -72,18 +91,15 @@ export function useFlowPanZoom(viewportRef: Ref<HTMLElement | null>, contentRef:
 
     const vp = viewport.getBoundingClientRect()
 
-    // Find the topmost node — Mermaid always assigns "flowchart-n0-*" to the first node
     const topNode = content.querySelector<SVGGElement>('[id^="flowchart-n0-"]')
 
     if (topNode) {
       const nodeBox = topNode.getBoundingClientRect()
       const topBuffer = 64
-      // Centre horizontally on the top node, place it near the top of the viewport
       const dx = vp.left + vp.width / 2 - (nodeBox.left + nodeBox.width / 2)
       const dy = vp.top + topBuffer - nodeBox.top
       instance.pan(dx, dy, { relative: true })
     } else {
-      // Fallback: centre the whole SVG
       const box = svg.getBoundingClientRect()
       if (box.width === 0 || box.height === 0) return
       const dx = vp.left + vp.width / 2 - (box.left + box.width / 2)
@@ -94,5 +110,5 @@ export function useFlowPanZoom(viewportRef: Ref<HTMLElement | null>, contentRef:
 
   onUnmounted(unbind)
 
-  return { bind, unbind, zoomIn, zoomOut, reset, centerView }
+  return { bind, unbind, zoomIn, zoomOut, reset, centerView, getViewport, setViewport }
 }

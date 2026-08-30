@@ -7,18 +7,32 @@ export async function fetchGraphRoot(payload: GraphRootPayload): Promise<FlowGra
   return api.graph(payload)
 }
 
+function sortByPriority(ids: string[], priority: Set<string>): string[] {
+  return [...ids].sort((a, b) => {
+    const av = priority.has(a) ? 0 : 1
+    const bv = priority.has(b) ? 0 : 1
+    return av - bv
+  })
+}
+
 export async function enrichSymbolNodes(
   state: SymbolFlowState,
   payload: GraphRootPayload,
   nodeIds: string[],
   inFlight?: Set<string>,
-): Promise<void> {
-  const pending = nodeIds.filter((id) => !state.enrichedIds.has(id) && !inFlight?.has(id))
-  if (pending.length === 0) return
+  priorityIds?: Set<string>,
+): Promise<{ enrichError: string | null }> {
+  let pending = nodeIds.filter((id) => !state.enrichedIds.has(id) && !inFlight?.has(id))
+  if (pending.length === 0) return { enrichError: null }
+
+  if (priorityIds?.size) {
+    pending = sortByPriority(pending, priorityIds)
+  }
 
   for (const id of pending) inFlight?.add(id)
 
   const byId = new Map(state.allNodes.map((n) => [n.id, n]))
+  let enrichError: string | null = null
   try {
     for (let i = 0; i < pending.length; i += 8) {
       const batch = pending.slice(i, i + 8)
@@ -29,6 +43,7 @@ export async function enrichSymbolNodes(
           line: n.line ?? 0,
           code: n.code ?? n.summary,
           kind: n.kind,
+          label: n.label,
         }
       })
       try {
@@ -44,13 +59,21 @@ export async function enrichSymbolNodes(
           if (!node) continue
           if (patch.title) node.title = patch.title
           if (patch.summary) node.summary = patch.summary
+          if (patch.labelSource) {
+            node.labelSource = patch.labelSource
+            if (patch.labelSource === 'ai' || patch.labelSource === 'heuristic') {
+              node.confidence = 'inferred'
+            }
+          }
           state.enrichedIds.add(patch.id)
         }
-      } catch {
-        continue
+      } catch (err) {
+        enrichError = err instanceof Error ? err.message : 'Failed to label flow steps'
+        console.warn('[enrich]', enrichError)
       }
     }
   } finally {
     for (const id of pending) inFlight?.delete(id)
   }
+  return { enrichError }
 }

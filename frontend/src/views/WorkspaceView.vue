@@ -9,6 +9,7 @@ import SymbolBar from '@/components/workspace/SymbolBar.vue'
 import FlowCanvas from '@/components/workspace/FlowCanvas.vue'
 import FlowWarmOverlay from '@/components/workspace/FlowWarmOverlay.vue'
 import BranchPrompt from '@/components/workspace/BranchPrompt.vue'
+import CompactFlowPreview from '@/components/workspace/CompactFlowPreview.vue'
 import Modal from '@/components/ui/Modal.vue'
 import CodePanel from '@/components/workspace/CodePanel.vue'
 import ResizeHandle from '@/components/ui/ResizeHandle.vue'
@@ -52,6 +53,7 @@ const {
   rootId,
   loading,
   enriching,
+  enrichError,
   expanding,
   mappingFullFlow,
   mappingProgress,
@@ -87,6 +89,8 @@ const sourcePath = ref('')
 const sourceLine = ref<number | undefined>(undefined)
 const branchPromptOpen = ref(false)
 const branchNode = ref<FlowNode | null>(null)
+const compactPreviewOpen = ref(false)
+const compactPreviewNode = ref<FlowNode | null>(null)
 
 const router = useRouter()
 const leaveConfirmOpen = ref(false)
@@ -216,6 +220,11 @@ function onShowFullFlow(): void {
   void revealFullFlow(graphPayload())
 }
 
+function onPreviewCompacted(node: FlowNode): void {
+  compactPreviewNode.value = node
+  compactPreviewOpen.value = true
+}
+
 function fileName(): string {
   return selectedPath.value.split('/').pop() ?? selectedPath.value
 }
@@ -281,6 +290,7 @@ function fileName(): string {
             :root-id="rootId"
             :loading="loading"
             :enriching="enriching"
+            :enrich-error="enrichError"
             :expanding="expanding"
             :mapping-full-flow="mappingFullFlow"
             :mapping-progress="mappingProgress"
@@ -301,6 +311,7 @@ function fileName(): string {
             @show-full-flow="onShowFullFlow"
             @view-source="onViewSource"
             @go-to-definition="onGoToDefinition"
+            @preview-compacted="onPreviewCompacted"
           />
 
           <div
@@ -350,6 +361,16 @@ function fileName(): string {
       :child-count="branchNode?.childCount ?? 0"
       @close="branchPromptOpen = false"
       @expand="onConfirmExpand"
+    />
+
+    <CompactFlowPreview
+      :open="compactPreviewOpen"
+      :workspace-id="userContext.workspaceId"
+      :file-path="compactPreviewNode?.calleeFile ?? ''"
+      :symbol="compactPreviewNode?.calleeSymbol ?? ''"
+      :line="compactPreviewNode?.calleeLine"
+      :user-context="userContext"
+      @close="compactPreviewOpen = false"
     />
   </div>
 </template>

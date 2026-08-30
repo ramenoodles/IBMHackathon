@@ -46,6 +46,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
   const currentFilePath = ref('')
   const currentWorkspace = ref('')
   const lastPayload = ref<GraphRootPayload | null>(null)
+  const enrichError = ref<string | null>(null)
 
   function snapshotState(): SymbolFlowState {
     return {
@@ -96,7 +97,10 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     edges.value = allEdges.value.filter((e) => revealed.has(e.from) && revealed.has(e.to))
   }
 
-  async function enrichNodes(nodeIds: string[], opts?: { background?: boolean }): Promise<void> {
+  async function enrichNodes(
+    nodeIds: string[],
+    opts?: { background?: boolean; priorityVisible?: boolean },
+  ): Promise<void> {
     const payload = lastPayload.value
     if (!payload || nodeIds.length === 0) return
 
@@ -106,7 +110,11 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     if (!opts?.background) enriching.value = true
     try {
       const state = snapshotState()
-      await enrichSymbolNodes(state, payload, pending, inFlightIds.value)
+      const priorityIds = opts?.priorityVisible ? new Set(revealedIds.value) : undefined
+      const result = await enrichSymbolNodes(state, payload, pending, inFlightIds.value, priorityIds)
+      if (result.enrichError) {
+        enrichError.value = result.enrichError
+      }
       allNodes.value = state.allNodes
       enrichedIds.value = state.enrichedIds
       syncVisible()
@@ -137,7 +145,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
       rootId.value
     const horizon = enrichmentHorizon(frontier, allEdges.value, ENRICHMENT_HORIZON_DEPTH, enrichedIds.value)
     const toEnrich = [...new Set([...buffer, ...horizon])].filter((id) => !enrichedIds.value.has(id))
-    if (toEnrich.length) void enrichNodes(toEnrich, { background: true })
+    if (toEnrich.length) void enrichNodes(toEnrich, { background: true, priorityVisible: true })
   }
 
   function prefetchAroundNode(_nodeId: string): void {
@@ -165,7 +173,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     revealedIds.value = revealed
     syncVisible()
     persistToCache()
-    void enrichNodes(newly, { background: true })
+    void enrichNodes(newly, { background: true, priorityVisible: true })
     maintainSilentBuffer()
     return newly
   }
@@ -323,6 +331,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
 
     loading.value = true
     error.value = null
+    enrichError.value = null
     parentPath.value = []
     currentFilePath.value = payload.filePath
     currentWorkspace.value = payload.workspaceId
@@ -347,6 +356,8 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
       syncVisible()
       loading.value = false
       persistToCache()
+      const visibleIds = [...revealedIds.value]
+      void enrichNodes(visibleIds, { background: false, priorityVisible: true })
       maintainSilentBuffer()
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load graph'
@@ -382,7 +393,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
       syncVisible()
       persistToCache()
       if (newIds.length) {
-        void enrichNodes(newIds, { background: true })
+        void enrichNodes(newIds, { background: true, priorityVisible: true })
         maintainSilentBuffer()
       }
     } catch (err) {
@@ -417,6 +428,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     rootId,
     symbol,
     loading,
+    enrichError,
     enriching,
     expanding,
     mappingFullFlow,

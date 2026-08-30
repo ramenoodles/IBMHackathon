@@ -6,13 +6,14 @@ import type { FlowEdge, FlowNode, NodeDetail } from '@/types/flowGraph'
 import { computed, nextTick, ref, watch } from 'vue'
 import MarkdownView from '@/components/workspace/MarkdownView.vue'
 import LoadingStatus from '@/components/ui/LoadingStatus.vue'
-import { nodeDisplayTitle, useFlowMermaid } from '@/composables/useFlowMermaid'
+import { graphStructureKey, nodeDisplayTitle, useFlowMermaid } from '@/composables/useFlowMermaid'
 import { useFlowPanZoom } from '@/composables/useFlowPanZoom'
 import { useHorizontalResize } from '@/composables/usePanelResize'
 import { useWorkspaceLayout } from '@/composables/useWorkspaceLayout'
 import ResizeHandle from '@/components/ui/ResizeHandle.vue'
 import { AI_LOADING_PHRASES } from '@/constants/aiLoadingPhrases'
 import { edgeOrder } from '@/utils/flowGraphUtils'
+import { hasEnrichedLabel, isCompactNode, labelSourceBadge, labelSourcePill } from '@/utils/flowGraphLabels'
 
 const {
   tracePanelOpen,
@@ -55,6 +56,7 @@ const props = defineProps<{
   rootId: string
   loading: boolean
   enriching: boolean
+  enrichError: string | null
   expanding: boolean
   mappingFullFlow: boolean
   mappingProgress: number
@@ -78,6 +80,7 @@ const emit = defineEmits<{
   requestDetail: [node: FlowNode]
   viewSource: [file?: string, line?: number]
   goToDefinition: [file: string, symbol: string, line?: number]
+  previewCompacted: [node: FlowNode]
 }>()
 
 const mermaidContainer = ref<HTMLElement | null>(null)
@@ -86,10 +89,31 @@ const panContent = ref<HTMLElement | null>(null)
 const deepDiveOpen = ref(false)
 const evidenceOpen = ref(false)
 
-const { bind: bindPanZoom, unbind: unbindPanZoom, zoomIn, zoomOut, centerView } = useFlowPanZoom(
+const { bind: bindPanZoom, unbind: unbindPanZoom, zoomIn, zoomOut, centerView, getViewport, setViewport } = useFlowPanZoom(
   panViewport,
   panContent,
 )
+
+const lastCenteredKey = ref('')
+
+const graphMountKey = computed(
+  () => `${props.symbol}:${graphStructureKey(props.nodes, props.edges)}`,
+)
+
+function onGraphRender(reason: 'structure' | 'label'): void {
+  if (reason === 'label') return
+  void nextTick(() => {
+    const prior = getViewport()
+    const shouldCenter = lastCenteredKey.value !== graphMountKey.value
+    bindPanZoom()
+    if (shouldCenter) {
+      centerView()
+      lastCenteredKey.value = graphMountKey.value
+    } else if (prior) {
+      setViewport(prior)
+    }
+  })
+}
 
 function onNodeClick(node: FlowNode): void {
   if (!props.fullyExpanded && node.collapsed && node.expandable) {
@@ -107,12 +131,13 @@ const { renderError, setContainer, renderStructural } = useFlowMermaid(
   () => (props.mappingFullFlow ? [] : props.edges),
   () => props.selectedNodeId,
   onNodeClick,
+  onGraphRender,
+)
+
+watch(
+  () => props.symbol,
   () => {
-    void nextTick(() => {
-      bindPanZoom()
-      // Default view on each new chart: centred on the top node at current scale
-      centerView()
-    })
+    lastCenteredKey.value = ''
   },
 )
 
@@ -169,12 +194,13 @@ const orderedNodes = computed(() => {
 
 const selectedNode = computed(() => props.nodes.find((n) => n.id === props.selectedNodeId))
 const hasDetailContent = computed(() => Boolean(props.selectedNodeId && selectedNode.value))
-const showAiSummary = computed(() => {
+const showEnrichedSummary = computed(() => {
   const node = selectedNode.value
   if (!node?.summary?.trim()) return false
-  const title = nodeDisplayTitle(node)
-  return node.summary.trim() !== title
+  return hasEnrichedLabel(node)
 })
+
+const enrichedBadge = computed(() => labelSourceBadge(selectedNode.value?.labelSource))
 
 const verifiedExplanation = computed(
   () => props.detail?.verifiedExplanation?.trim() || '',
@@ -225,11 +251,40 @@ function openDeepDive(): void {
       </div>
 
       <template v-else>
-        <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-2">
-          <span class="text-xs text-slate-600">
-            {{ nodes.length }} step{{ nodes.length !== 1 ? 's' : '' }}
-          </span>
-          <div class="flex items-center gap-3">
+        <div class="flex shrink-0 items-center justify-between gap-2 border-b border-slate-800 px-4 py-2">
+          <div class="flex min-w-0 items-center gap-2">
+            <span class="shrink-0 text-xs text-slate-600">
+              {{ nodes.length }} step{{ nodes.length !== 1 ? 's' : '' }}
+            </span>
+            <span
+              v-if="enriching"
+              class="shrink-0 text-xs font-medium text-amber-400/90"
+            >
+              Labeling steps…
+            </span>
+          </div>
+          <div class="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+            <div
+              class="hidden items-center gap-2 border-r border-slate-800 pr-2 text-[10px] font-medium uppercase tracking-wide text-slate-500 sm:flex"
+              aria-label="Flow map legend"
+            >
+              <span class="flex items-center gap-1" title="Box title still from static code scan">
+                <span class="h-2.5 w-2.5 rounded-sm border-2 border-green-400 bg-green-950" />
+                Scan
+              </span>
+              <span class="flex items-center gap-1" title="Onboarding label from Watsonx">
+                <span class="h-2.5 w-2.5 rounded-sm border-2 border-dashed border-amber-400 bg-amber-950" />
+                AI
+              </span>
+              <span class="flex items-center gap-1" title="Pattern-based onboarding label">
+                <span class="h-2.5 w-2.5 rounded-sm border-2 border-cyan-400 bg-cyan-950" />
+                Auto
+              </span>
+              <span class="flex items-center gap-1" title="Callee folded into one node — preview or click to expand">
+                <span class="h-2.5 w-2.5 rounded-sm border-2 border-onbober-primary bg-slate-800" />
+                Compact
+              </span>
+            </div>
             <div class="flex items-center gap-1">
               <button
                 type="button"
@@ -299,6 +354,9 @@ function openDeepDive(): void {
         </div>
 
         <p v-if="error" class="shrink-0 px-4 py-2 text-sm text-red-400">{{ error }}</p>
+        <p v-if="enrichError && !error" class="shrink-0 px-4 py-1.5 text-xs text-amber-400/90">
+          {{ enrichError }} — showing verified labels only.
+        </p>
 
         <div class="flex min-h-0 flex-1">
           <div
@@ -344,6 +402,30 @@ function openDeepDive(): void {
                       <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-100">
                         {{ nodeDisplayTitle(node) }}
                       </span>
+                      <span
+                        v-if="labelSourcePill(node.labelSource)"
+                        class="shrink-0 rounded px-1 py-0.5 text-[10px] font-bold uppercase"
+                        :class="
+                          node.labelSource === 'ai'
+                            ? 'bg-amber-900/30 text-amber-400'
+                            : 'bg-cyan-900/30 text-cyan-400'
+                        "
+                      >
+                        {{ labelSourcePill(node.labelSource) }}
+                      </span>
+                      <button
+                        v-if="isCompactNode(node)"
+                        type="button"
+                        class="shrink-0 rounded p-0.5 text-onbober-primary hover:bg-onbober-primary/10"
+                        title="Preview compacted flow"
+                        aria-label="Preview compacted flow"
+                        @click.stop="emit('previewCompacted', node)"
+                      >
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                          <path d="M8 2L2 5.5v5L8 14l6-3.5v-5L8 2z" />
+                          <path d="M2 5.5L8 9l6-3.5M8 9v5" />
+                        </svg>
+                      </button>
                       <span
                         v-if="hasHiddenChildren(node.id)"
                         class="shrink-0 rounded bg-onbober-primary/20 px-1.5 py-0.5 text-xs font-bold uppercase text-onbober-primary"
@@ -444,11 +526,23 @@ function openDeepDive(): void {
           <p v-else class="mt-2 text-sm text-slate-500">No source snippet for this step.</p>
         </section>
 
-        <section v-if="showAiSummary" class="mt-4">
-          <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-2 py-0.5 text-xs font-bold uppercase text-amber-400">
-            AI label
+        <section v-if="showEnrichedSummary && enrichedBadge" class="mt-4">
+          <span
+            class="inline-block rounded px-2 py-0.5 text-xs font-bold uppercase"
+            :class="
+              selectedNode.labelSource === 'ai'
+                ? 'border border-dashed border-amber-600/50 bg-amber-900/20 text-amber-400'
+                : 'border border-dashed border-cyan-600/50 bg-cyan-900/20 text-cyan-400'
+            "
+          >
+            {{ enrichedBadge }}
           </span>
-          <p class="mt-2 text-sm leading-relaxed text-amber-300/90">{{ selectedNode.summary }}</p>
+          <p
+            class="mt-2 text-sm leading-relaxed"
+            :class="selectedNode.labelSource === 'ai' ? 'text-amber-300/90' : 'text-cyan-300/90'"
+          >
+            {{ selectedNode.summary }}
+          </p>
         </section>
 
         <section class="mt-4">

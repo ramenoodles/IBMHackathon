@@ -70,6 +70,30 @@ func (w *WatsonxClient) AskAgent(
 	return w.runAgent(ctx, messages)
 }
 
+func (w *WatsonxClient) EnrichBatch(ctx context.Context, prompt string) (string, error) {
+	messages := []wx.ChatMessage{
+		wx.CreateSystemMessage(
+			"You label execution-flow steps for developer onboarding. " +
+				"Respond with strict JSON only — no markdown fences, no commentary.",
+		),
+		stringMessage(wx.RoleUser, prompt),
+	}
+
+	response, err := w.client.Chat(
+		w.model,
+		messages,
+		wx.WithChatTemperature(0.1),
+		wx.WithChatMaxTokens(2048),
+	)
+	if err != nil {
+		return "", fmt.Errorf("watsonx enrich chat: %w", err)
+	}
+	if len(response.Choices) == 0 || response.Choices[0].Message == nil {
+		return "", fmt.Errorf("watsonx enrich returned no message")
+	}
+	return response.Choices[0].Message.Content.GetText(), nil
+}
+
 func (w *WatsonxClient) Explain(
 	ctx context.Context,
 	source string,

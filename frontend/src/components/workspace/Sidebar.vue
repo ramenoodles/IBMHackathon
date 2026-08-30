@@ -4,6 +4,7 @@
  */
 import { onMounted, provide, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import FileSearchBar from '@/components/workspace/FileSearchBar.vue'
 import FileTreeNode from '@/components/workspace/FileTreeNode.vue'
 import { fetchTreeEntries, type TreeEntry } from '@/composables/useFileTree'
 import { ApiError } from '@/api'
@@ -89,6 +90,7 @@ watch(() => props.workspaceId, loadRoot)
         </button>
       </div>
     </div>
+    <FileSearchBar :workspace-id="workspaceId" @select="emit('select', $event)" />
     <div class="flex-1 overflow-y-auto p-1.5 text-sm">
       <p v-if="loading" class="px-2 py-1 text-xs text-slate-500">Loading...</p>
       <ul v-else class="space-y-0.5">

@@ -5,6 +5,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import BeaverRepoLoader from '@/components/ui/BeaverRepoLoader.vue'
 import LoadingStatus from '@/components/ui/LoadingStatus.vue'
 import logo from '@/assets/logo.png'
 import {
@@ -22,7 +23,7 @@ import {
   WORKSPACE_SETUP_PHRASES,
   ZIP_SETUP_PHRASES,
 } from '@/constants/workspaceSetupPhrases'
-import { DEMO_REPO_LABEL, DEMO_REPO_URL } from '@/constants/demoRepo'
+import { DEMO_REPO_LABEL, DEMO_REPO_URL, formatRepoDisplayLabel } from '@/constants/demoRepo'
 
 const router = useRouter()
 const { loading, error, setupLocal, setupGitHub, setupDemo, setupZip } = useWorkspaceSetup()
@@ -126,12 +127,20 @@ const setupPhrases = computed(() => {
 })
 
 const setupSourceLabel = computed(() => {
-  if (sourceTab.value === 'demo') return DEMO_REPO_URL
+  if (sourceTab.value === 'demo') return DEMO_REPO_LABEL
   if (sourceTab.value === 'zip' && zipFile.value) return zipFile.value.name
-  if (sourceTab.value === 'github' && githubUrl.value.trim()) return githubUrl.value.trim()
+  if (sourceTab.value === 'github' && githubUrl.value.trim()) {
+    return formatRepoDisplayLabel(githubUrl.value)
+  }
   if (sourceTab.value === 'local' && localPath.value.trim()) return localPath.value.trim()
   return ''
 })
+
+const githubPlaceholder = `${DEMO_REPO_LABEL} or ${DEMO_REPO_URL}`
+
+const useBeaverLoader = computed(
+  () => sourceTab.value === 'demo' || sourceTab.value === 'github' || sourceTab.value === 'zip',
+)
 
 const canProceed = computed(() => {
   if (step.value === 1) return selectedLangLabels.value.size > 0
@@ -183,6 +192,13 @@ async function nextStep(): Promise<void> {
 /** Return to the previous onboarding step. */
 function prevStep(): void {
   if (step.value > 1) step.value -= 1
+}
+
+/** Submit step 3 from a text input when Enter is pressed. */
+function onSourceKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Enter' || step.value !== totalSteps || !canProceed.value || loading.value) return
+  event.preventDefault()
+  void nextStep()
 }
 </script>
 
@@ -269,21 +285,30 @@ function prevStep(): void {
 
       <div v-else>
         <template v-if="loading">
-          <h2 class="mb-2 text-2xl font-bold text-white">Setting up your workspace</h2>
-          <p class="mb-6 text-slate-400">This may take a moment for larger archives.</p>
-          <div class="rounded-lg border border-slate-800 bg-slate-950 px-6 py-8">
-            <p v-if="setupSourceLabel" class="mb-4 truncate text-center font-mono text-sm text-slate-400">
-              {{ setupSourceLabel }}
-            </p>
-            <div class="flex justify-center">
-              <LoadingStatus
-                :active="true"
-                :phrases="setupPhrases"
-                :show-shimmer="false"
-                phrase-class="text-sm text-slate-400"
-              />
-            </div>
+          <div v-if="useBeaverLoader" class="rounded-lg border border-slate-800 bg-slate-950 px-2 py-4 pb-10">
+            <BeaverRepoLoader
+              :active="loading"
+              :phrases="setupPhrases"
+              :source-label="setupSourceLabel"
+            />
           </div>
+          <template v-else>
+            <h2 class="mb-2 text-2xl font-bold text-white">Setting up your workspace</h2>
+            <p class="mb-6 text-slate-400">This may take a moment for larger archives.</p>
+            <div class="rounded-lg border border-slate-800 bg-slate-950 px-6 py-8">
+              <p v-if="setupSourceLabel" class="mb-4 truncate text-center font-mono text-sm text-slate-400">
+                {{ setupSourceLabel }}
+              </p>
+              <div class="flex justify-center">
+                <LoadingStatus
+                  :active="true"
+                  :phrases="setupPhrases"
+                  :show-shimmer="false"
+                  phrase-class="text-sm text-slate-400"
+                />
+              </div>
+            </div>
+          </template>
         </template>
 
         <template v-else>
@@ -323,6 +348,7 @@ function prevStep(): void {
               type="text"
               placeholder="C:\codebases\linux"
               class="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-onbober-primary focus:outline-none"
+              @keydown="onSourceKeydown"
             />
             <p class="mt-2 text-xs text-slate-500">Absolute path to an existing folder on your machine.</p>
           </div>
@@ -331,11 +357,12 @@ function prevStep(): void {
             <input
               v-model="githubUrl"
               type="text"
-              placeholder="https://github.com/torvalds/linux"
+              :placeholder="githubPlaceholder"
               class="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-onbober-primary focus:outline-none"
+              @keydown="onSourceKeydown"
             />
             <p class="mt-2 text-xs text-slate-500">
-              Public repos only. Shallow clone — requires git on the server machine.
+              Public repos only — use <span class="font-mono">owner/repo</span> or a full URL. Shallow clone; requires git on the server.
             </p>
           </div>
 

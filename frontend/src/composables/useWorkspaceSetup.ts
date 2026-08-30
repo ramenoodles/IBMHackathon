@@ -2,6 +2,21 @@ import { ref } from 'vue'
 import { api, type Workspace } from '@/api'
 import { DEMO_REPO_URL } from '@/constants/demoRepo'
 
+/** Normalize owner/repo shorthand or partial URLs to a full github.com clone URL. */
+export function normalizeGitHubUrl(input: string): string {
+  let url = input.trim().replace(/\/$/, '').replace(/\.git$/, '')
+  if (/^[\w.-]+\/[\w.-]+$/.test(url)) {
+    return `https://github.com/${url}`
+  }
+  if (/^github\.com\//i.test(url)) {
+    return `https://${url}`
+  }
+  if (/^www\.github\.com\//i.test(url)) {
+    return `https://${url.replace(/^www\./i, '')}`
+  }
+  return url
+}
+
 /** Source type for workspace onboarding step. */
 export type WorkspaceSource = 'demo' | 'local' | 'github' | 'zip'
 
@@ -27,7 +42,7 @@ export function useWorkspaceSetup() {
    * @returns Resolved workspace path after clone completes.
    */
   async function setupGitHub(url: string): Promise<Workspace> {
-    return setup({ source: 'github', url })
+    return setup({ source: 'github', url: normalizeGitHubUrl(url) })
   }
 
   /** Clone the bundled IBM Bob demo repository. */

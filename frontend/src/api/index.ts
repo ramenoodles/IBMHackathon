@@ -123,7 +123,7 @@ export const api = {
     nodes: EnrichNodeInput[]
     userContext: GraphRootPayload['userContext']
   }): Promise<EnrichResult> {
-    return request<EnrichResult>(workspacePath(workspaceId, 'explain'), jsonBody(body))
+    return request<EnrichResult>(workspacePath(workspaceId, 'graphs/enrich'), jsonBody(body))
   },
 
   async explainStream(workspaceId: string, body: {

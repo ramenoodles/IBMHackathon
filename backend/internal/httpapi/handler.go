@@ -43,6 +43,7 @@ func (h *Handler) Handler() http.Handler {
 	mux.HandleFunc("GET /api/workspaces/{id}/symbols", h.symbols)
 	mux.HandleFunc("POST /api/workspaces/{id}/graphs", h.graph)
 	mux.HandleFunc("POST /api/workspaces/{id}/graphs/expand", h.expand)
+	mux.HandleFunc("POST /api/workspaces/{id}/graphs/enrich", h.enrich)
 	mux.HandleFunc("POST /api/workspaces/{id}/explain", h.explain)
 	return cors(mux)
 }
@@ -230,6 +231,54 @@ func (h *Handler) expand(w http.ResponseWriter, r *http.Request) {
 	}
 	write(w, 200, g)
 }
+func (h *Handler) enrich(w http.ResponseWriter, r *http.Request) {
+	ws, ok := h.get(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		FilePath    string `json:"filePath"`
+		Symbol      string `json:"symbol"`
+		Nodes       []service.EnrichNodeInput `json:"nodes"`
+		UserContext service.EnrichUserContext `json:"userContext"`
+	}
+	if json.NewDecoder(r.Body).Decode(&in) != nil || len(in.Nodes) == 0 {
+		fail(w, 400, "nodes are required")
+		return
+	}
+	if in.Symbol == "" {
+		fail(w, 400, "symbol is required")
+		return
+	}
+
+	var client llm.Client
+	if h.WatsonxEnabled {
+		watsonx, e := llm.NewWatsonxClient(h.WatsonxModel, ws.Root, h.RGBinary, h.WatsonxAPIKey, h.WatsonxProjectID)
+		if e != nil {
+			fail(w, 500, e.Error())
+			return
+		}
+		client = watsonx
+	}
+
+	s, e := service.New(ws.Root, h.RGBinary, client, false)
+	if e != nil {
+		fail(w, 500, e.Error())
+		return
+	}
+	res, e := s.Enrich(r.Context(), service.EnrichRequest{
+		FilePath:    in.FilePath,
+		Symbol:      in.Symbol,
+		Nodes:       in.Nodes,
+		UserContext: in.UserContext,
+	})
+	if e != nil {
+		fail(w, 500, e.Error())
+		return
+	}
+	write(w, 200, res)
+}
+
 func (h *Handler) explain(w http.ResponseWriter, r *http.Request) {
 	ws, ok := h.get(w, r)
 	if !ok {
