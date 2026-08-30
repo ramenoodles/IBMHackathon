@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { api, type Workspace } from '@/api'
 
 /** Source type for workspace onboarding step. */
 export type WorkspaceSource = 'local' | 'github' | 'zip'
@@ -15,7 +16,7 @@ export function useWorkspaceSetup() {
    * @param path - Absolute path on the user's machine.
    * @returns Resolved workspace path usable by the scanner.
    */
-  async function setupLocal(path: string): Promise<string> {
+  async function setupLocal(path: string): Promise<Workspace> {
     return setup({ source: 'local', path })
   }
 
@@ -24,7 +25,7 @@ export function useWorkspaceSetup() {
    * @param url - GitHub URL or owner/repo shorthand.
    * @returns Resolved workspace path after clone completes.
    */
-  async function setupGitHub(url: string): Promise<string> {
+  async function setupGitHub(url: string): Promise<Workspace> {
     return setup({ source: 'github', url })
   }
 
@@ -33,19 +34,11 @@ export function useWorkspaceSetup() {
    * @param file - Zip file selected by the user.
    * @returns Resolved workspace path after extraction.
    */
-  async function setupZip(file: File): Promise<string> {
+  async function setupZip(file: File): Promise<Workspace> {
     loading.value = true
     error.value = null
     try {
-      const form = new FormData()
-      form.append('file', file)
-      const res = await fetch('/api/workspace/upload', { method: 'POST', body: form })
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || `Upload failed (${res.status})`)
-      }
-      const data = (await res.json()) as { workspacePath: string }
-      return data.workspacePath
+      return await api.uploadWorkspace(file)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Upload failed'
       throw err
@@ -61,21 +54,11 @@ export function useWorkspaceSetup() {
     source: 'local' | 'github'
     path?: string
     url?: string
-  }): Promise<string> {
+  }): Promise<Workspace> {
     loading.value = true
     error.value = null
     try {
-      const res = await fetch('/api/workspace/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || `Setup failed (${res.status})`)
-      }
-      const data = (await res.json()) as { workspacePath: string }
-      return data.workspacePath
+      return await api.createWorkspace(body)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Setup failed'
       throw err

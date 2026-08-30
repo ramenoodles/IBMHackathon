@@ -1,7 +1,4 @@
-# Deprecated Location
+# OnBober
 
-The OnBober frontend has moved to [`../frontend/`](../frontend/).
-
-The Go backend lives at [`../backend/`](../backend/).
-
-See the [project README](../README.md) for setup instructions.
+The active frontend is in `../frontend`; the unified Go API is in
+`../backend/cmd/api`.

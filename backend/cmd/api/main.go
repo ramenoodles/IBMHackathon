@@ -1,79 +1,41 @@
-// Package main is the entry point for the OnBober API server.
 package main
 
 import (
 	"context"
+	"fmt"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/config"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/httpapi"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/workspace"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
-
-	"github.com/ibmhackathon/onbober/internal/handlers"
-	"github.com/ibmhackathon/onbober/internal/llm"
-	"github.com/ibmhackathon/onbober/internal/workspace"
 )
 
-// main bootstraps the HTTP server with API routes and graceful shutdown.
 func main() {
-	port := envOrDefault("PORT", "8080")
-	ollamaURL := envOrDefault("OLLAMA_URL", "http://localhost:11434")
-	ollamaModel := envOrDefault("OLLAMA_MODEL", "qwen2.5:7b")
-
-	llmClient := llm.NewOllamaClient(ollamaURL, ollamaModel)
-
-	workspaceRoot := envOrDefault("ONBOBER_WORKSPACE_ROOT", filepath.Join(os.TempDir(), "onbober-workspaces"))
-	wsManager, err := workspace.NewManager(workspaceRoot)
-	if err != nil {
-		log.Fatalf("workspace manager: %v", err)
+	cfg := config.FromEnvironment()
+	m, e := workspace.NewManager()
+	if e != nil {
+		log.Fatal(e)
 	}
-
-	h := handlers.NewHandler(llmClient, wsManager)
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/health", h.Health)
-	mux.HandleFunc("/api/tree", h.Tree)
-	mux.HandleFunc("/api/file/symbols", h.FileSymbols)
-	mux.HandleFunc("/api/file", h.File)
-	mux.HandleFunc("/api/analyze", h.Analyze)
-	mux.HandleFunc("/api/graph/root", h.GraphRoot)
-	mux.HandleFunc("/api/graph/expand", h.GraphExpand)
-	mux.HandleFunc("/api/graph/enrich", h.GraphEnrich)
-	mux.HandleFunc("/api/graph/node", h.GraphNode)
-	mux.HandleFunc("/api/graph/node/stream", h.GraphNodeStream)
-	mux.HandleFunc("/api/workspace/setup", h.WorkspaceSetup)
-	mux.HandleFunc("/api/workspace/upload", h.WorkspaceUpload)
-
-	server := &http.Server{
-		Addr:              ":" + port,
-		Handler:           handlers.WithCORS(mux),
-		ReadHeaderTimeout: 10 * time.Second,
-	}
-
+	defer m.Close()
+	h := httpapi.New(m, cfg.RGBinary, cfg.WatsonxModel, cfg.WatsonxAPIKey != "" && cfg.WatsonxProjectID != "" && cfg.WatsonxModel != "")
+	srv := &http.Server{Addr: cfg.Host + ":" + cfg.Port, Handler: timeout(h.Handler()), ReadHeaderTimeout: 10 * time.Second, WriteTimeout: 120 * time.Second, IdleTimeout: 60 * time.Second}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	go func() {
-		log.Printf("OnBober API listening on :%s", port)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server error: %v", err)
-		}
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx)
 	}()
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-	<-stop
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
-		log.Printf("shutdown error: %v", err)
+	log.Printf("grepwrapper API listening on %s", srv.Addr)
+	if e := srv.ListenAndServe(); e != nil && e != http.ErrServerClosed {
+		log.Fatal(e)
 	}
 }
-
-// envOrDefault returns the environment variable value or a fallback default.
-func envOrDefault(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
+func timeout(next http.Handler) http.Handler {
+	return http.TimeoutHandler(next, 120*time.Second, fmt.Sprintf(`{"error":{"code":"timeout","message":"request timed out"}}`))
 }

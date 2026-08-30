@@ -77,19 +77,19 @@ export interface NodeDetail {
 
 /** Payload for loading a root graph. */
 export interface GraphRootPayload {
-  workspacePath: string
+  workspaceId: string
   filePath: string
   symbol: string
   userContext: {
     primaryLanguage: string
     experienceLevel: string
-    workspacePath: string
+    workspaceId: string
   }
 }
 
 /** Payload for expanding a collapsed node. */
 export interface GraphExpandPayload {
-  workspacePath: string
+  workspaceId: string
   filePath: string
   symbol: string
   nodeId: string

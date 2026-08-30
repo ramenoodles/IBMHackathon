@@ -100,7 +100,7 @@ const symbolBarNames = computed(() => {
 
 function graphPayload() {
   return {
-    workspacePath: userContext.value.workspacePath,
+    workspaceId: userContext.value.workspaceId,
     filePath: selectedPath.value,
     symbol: symbol.value,
     userContext: { ...userContext.value },
@@ -121,7 +121,7 @@ async function onSelectFile(path: string): Promise<void> {
     if (warmedSymbolNames.value[0]) {
       symbol.value = warmedSymbolNames.value[0]
       activateSymbol(warmedSymbolNames.value[0], {
-        workspacePath: userContext.value.workspacePath,
+        workspaceId: userContext.value.workspaceId,
         filePath: path,
         symbol: warmedSymbolNames.value[0],
         userContext: { ...userContext.value },
@@ -131,7 +131,7 @@ async function onSelectFile(path: string): Promise<void> {
   }
 
   workspacePhase.value = 'brief'
-  await loadSymbols(userContext.value.workspacePath, path)
+  await loadSymbols(userContext.value.workspaceId, path)
 }
 
 function onDeclineFlowInit(): void {
@@ -143,7 +143,7 @@ async function onConfirmFlowInit(selected: string[]): Promise<void> {
   workspacePhase.value = 'warming'
   warmedSymbolNames.value = selected
   const base = {
-    workspacePath: userContext.value.workspacePath,
+    workspaceId: userContext.value.workspaceId,
     filePath: selectedPath.value,
     userContext: { ...userContext.value },
   }
@@ -177,7 +177,7 @@ function onSelectNode(node: FlowNode): void {
 function onRequestDetail(node: FlowNode): void {
   void loadDetail(
     {
-      workspace: userContext.value.workspacePath,
+       workspaceId: userContext.value.workspaceId,
       nodeId: node.id,
       symbol: symbol.value,
       file: node.file ?? selectedPath.value,
@@ -267,7 +267,7 @@ function fileName(): string {
 
       <Sidebar
         v-show="sidebarOpen"
-        :workspace-path="userContext.workspacePath"
+        :workspace-id="userContext.workspaceId"
         :selected-path="selectedPath"
         :width="explorerWidth"
         @select="onSelectFile"
@@ -283,7 +283,7 @@ function fileName(): string {
       <div class="relative flex min-w-0 flex-1 flex-col">
         <SymbolBar
           v-if="showSymbolBar"
-          :workspace-path="userContext.workspacePath"
+          :workspace-id="userContext.workspaceId"
           :file-path="selectedPath"
           :active-symbol="symbol"
           :symbol-names="symbolBarNames"
@@ -371,7 +371,7 @@ function fileName(): string {
       <div class="max-h-[60vh] overflow-auto">
         <CodePanel
           v-if="sourcePath || selectedPath"
-          :workspace-path="userContext.workspacePath"
+          :workspace-id="userContext.workspaceId"
           :file-path="sourcePath || selectedPath"
         />
       </div>

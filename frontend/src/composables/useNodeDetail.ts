@@ -1,8 +1,9 @@
 import { ref } from 'vue'
 import type { FlowConfidence, NodeDetail } from '@/types/flowGraph'
+import { api } from '@/api'
 
 export interface NodeDetailParams {
-  workspace: string
+  workspaceId: string
   nodeId: string
   symbol: string
   file?: string
@@ -21,11 +22,7 @@ function cacheKey(params: NodeDetailParams): string {
 }
 
 function buildQuery(params: NodeDetailParams): URLSearchParams {
-  const q = new URLSearchParams({
-    workspace: params.workspace,
-    nodeId: params.nodeId,
-    symbol: params.symbol,
-  })
+  const q = new URLSearchParams({ nodeId: params.nodeId, symbol: params.symbol })
   if (params.file) q.set('file', params.file)
   if (params.line) q.set('line', String(params.line))
   if (params.title) q.set('title', params.title)
@@ -103,16 +100,9 @@ export function useNodeDetail() {
     }
 
     try {
-      if (opts?.stream) {
-        await loadDetailStream(params, signal)
-      } else {
-        const q = buildQuery(params)
-        const res = await fetch(`/api/graph/node?${q}`, { signal })
-        if (!res.ok) throw new Error(`Detail failed (${res.status})`)
-        const parsed = (await res.json()) as NodeDetail
-        detail.value = parsed
-        setCached(params, parsed)
-      }
+      const parsed = await api.explain(params.workspaceId, { name: params.symbol, question: 'Explain this step.', language: params.language }, signal)
+      detail.value = { ...detail.value, ...parsed, id: params.nodeId, title: params.title ?? params.nodeId, summary: params.summary ?? '' }
+      setCached(params, detail.value)
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
       error.value = err instanceof Error ? err.message : 'Failed to load detail'
@@ -125,8 +115,7 @@ export function useNodeDetail() {
 
   async function loadDetailStream(params: NodeDetailParams, signal: AbortSignal): Promise<void> {
     const q = buildQuery(params)
-    const res = await fetch(`/api/graph/node/stream?${q}`, { signal })
-    if (!res.ok) throw new Error(`Detail stream failed (${res.status})`)
+    const res = await api.explainStream(params.workspaceId, { name: params.symbol, question: 'Explain this step.', language: params.language }, signal)
 
     const reader = res.body?.getReader()
     if (!reader) throw new Error('Response body is not readable')

@@ -14,7 +14,8 @@ export interface UserContext {
   /** Self-reported experience level. */
   experienceLevel: ExperienceLevel
   /** Absolute path to the local codebase workspace. */
-  workspacePath: string
+  workspaceId: string
+  workspaceName: string
 }
 
 const STORAGE_KEY = 'onbober:user-context'
@@ -22,7 +23,8 @@ const STORAGE_KEY = 'onbober:user-context'
 const defaultContext: UserContext = {
   primaryLanguage: '',
   experienceLevel: 'junior',
-  workspacePath: '',
+  workspaceId: '',
+  workspaceName: '',
 }
 
 /**
@@ -71,7 +73,7 @@ export function updateUserContext(partial: Partial<UserContext>): void {
  */
 export function isUserContextComplete(): boolean {
   const ctx = state.value
-  return Boolean(ctx.primaryLanguage && ctx.experienceLevel && ctx.workspacePath.trim())
+  return Boolean(ctx.primaryLanguage && ctx.experienceLevel && ctx.workspaceId.trim())
 }
 
 /**

@@ -7,7 +7,7 @@ import FileTreeNode from '@/components/workspace/FileTreeNode.vue'
 import { fetchTreeEntries, type TreeEntry } from '@/composables/useFileTree'
 
 const props = defineProps<{
-  workspacePath: string
+  workspaceId: string
   selectedPath: string
   width?: number
 }>()
@@ -21,17 +21,17 @@ const entries = ref<TreeEntry[]>([])
 const loading = ref(false)
 
 async function loadRoot(): Promise<void> {
-  if (!props.workspacePath) return
+  if (!props.workspaceId) return
   loading.value = true
   try {
-    entries.value = await fetchTreeEntries(props.workspacePath)
+    entries.value = await fetchTreeEntries(props.workspaceId)
   } finally {
     loading.value = false
   }
 }
 
 onMounted(loadRoot)
-watch(() => props.workspacePath, loadRoot)
+watch(() => props.workspaceId, loadRoot)
 </script>
 
 <template>
@@ -57,7 +57,7 @@ watch(() => props.workspacePath, loadRoot)
         <FileTreeNode
           v-for="entry in entries"
           :key="entry.path"
-          :workspace-path="workspacePath"
+          :workspace-id="workspaceId"
           :entry="entry"
           :selected-path="selectedPath"
           :depth="0"
