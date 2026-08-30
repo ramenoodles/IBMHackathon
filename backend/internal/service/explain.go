@@ -25,7 +25,7 @@ type ExplainResult struct {
 	Line       int                         `json:"line"`
 	StartLine  int                         `json:"start_line"`
 	EndLine    int                         `json:"end_line"`
-	Answer     string                      `json:"answer"`
+	Answer     string                      `json:"explanation"`
 	Trajectory []llmclient.TrajectoryEvent `json:"trajectory,omitempty"`
 }
 

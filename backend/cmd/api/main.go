@@ -3,25 +3,31 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/ramenoodles/IBMHackathon/backend/internal/config"
-	"github.com/ramenoodles/IBMHackathon/backend/internal/httpapi"
-	"github.com/ramenoodles/IBMHackathon/backend/internal/workspace"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/joho/godotenv"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/config"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/httpapi"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/workspace"
 )
 
 func main() {
+	// Load .env if present; ignore the error when the file doesn't exist
+	// (production environments supply vars directly).
+	_ = godotenv.Load()
+
 	cfg := config.FromEnvironment()
 	m, e := workspace.NewManager()
 	if e != nil {
 		log.Fatal(e)
 	}
 	defer m.Close()
-	h := httpapi.New(m, cfg.RGBinary, cfg.WatsonxModel, cfg.WatsonxAPIKey != "" && cfg.WatsonxProjectID != "" && cfg.WatsonxModel != "")
+	h := httpapi.New(m, cfg.RGBinary, cfg.WatsonxModel, cfg.WatsonxAPIKey, cfg.WatsonxProjectID, cfg.WatsonxAPIKey != "" && cfg.WatsonxProjectID != "" && cfg.WatsonxModel != "")
 	srv := &http.Server{Addr: cfg.Host + ":" + cfg.Port, Handler: timeout(h.Handler()), ReadHeaderTimeout: 10 * time.Second, WriteTimeout: 120 * time.Second, IdleTimeout: 60 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

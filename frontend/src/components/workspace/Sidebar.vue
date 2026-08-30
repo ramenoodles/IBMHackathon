@@ -3,8 +3,11 @@
  * Slim file explorer sidebar.
  */
 import { onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import FileTreeNode from '@/components/workspace/FileTreeNode.vue'
 import { fetchTreeEntries, type TreeEntry } from '@/composables/useFileTree'
+import { ApiError } from '@/api'
+import { clearUserContext } from '@/store/userContext'
 
 const props = defineProps<{
   workspaceId: string
@@ -21,11 +24,22 @@ const emit = defineEmits<{
 const entries = ref<TreeEntry[]>([])
 const loading = ref(false)
 
+const router = useRouter()
+
 async function loadRoot(): Promise<void> {
   if (!props.workspaceId) return
   loading.value = true
   try {
     entries.value = await fetchTreeEntries(props.workspaceId)
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      // Workspace no longer exists (backend restarted). Clear stale session and
+      // send the user back to onboarding to pick a workspace again.
+      clearUserContext()
+      router.push({ name: 'onboarding' })
+      return
+    }
+    throw err
   } finally {
     loading.value = false
   }

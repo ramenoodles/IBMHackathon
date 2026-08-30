@@ -16,8 +16,11 @@ type WatsonxClient struct {
 	tools  *repositoryTools
 }
 
-func NewWatsonxClient(model, root, rgBinary string) (*WatsonxClient, error) {
-	client, err := wx.NewClient()
+func NewWatsonxClient(model, root, rgBinary, apiKey, projectID string) (*WatsonxClient, error) {
+	client, err := wx.NewClient(
+		wx.WithWatsonxAPIKey(apiKey),
+		wx.WithWatsonxProjectID(projectID),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("create watsonx client: %w", err)
 	}

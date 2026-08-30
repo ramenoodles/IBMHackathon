@@ -20,7 +20,7 @@ import { useFlowGraph } from '@/composables/useFlowGraph'
 import { useSymbolBrief } from '@/composables/useSymbolBrief'
 import { useFileFlowWarm } from '@/composables/useFileFlowWarm'
 import { useNodeDetail } from '@/composables/useNodeDetail'
-import { userContext } from '@/store/userContext'
+import { userContext, normalizeLanguage } from '@/store/userContext'
 import type { FlowNode } from '@/types/flowGraph'
 
 type WorkspacePhase = 'idle' | 'brief' | 'tracing'
@@ -99,7 +99,7 @@ const router = useRouter()
 const leaveConfirmOpen = ref(false)
 
 const showSymbolBar = computed(
-  () => selectedPath.value && workspacePhase.value === 'tracing',
+  () => !!(selectedPath.value && workspacePhase.value === 'tracing'),
 )
 
 const symbolBarNames = computed(() => currentPageSymbols.value.map((s) => s.name))
@@ -168,7 +168,7 @@ function onRequestDetail(node: FlowNode): void {
       kind: node.kind,
       summary: node.summary,
       experience: userContext.value.experienceLevel,
-      language: userContext.value.primaryLanguage,
+      language: normalizeLanguage(userContext.value.primaryLanguage),
     },
     { stream: true },
   )

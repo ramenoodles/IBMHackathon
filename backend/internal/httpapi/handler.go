@@ -16,14 +16,23 @@ import (
 )
 
 type Handler struct {
-	Workspaces     *workspace.Manager
-	RGBinary       string
-	WatsonxModel   string
-	WatsonxEnabled bool
+	Workspaces        *workspace.Manager
+	RGBinary          string
+	WatsonxModel      string
+	WatsonxAPIKey     string
+	WatsonxProjectID  string
+	WatsonxEnabled    bool
 }
 
-func New(m *workspace.Manager, rg, model string, enabled bool) *Handler {
-	return &Handler{m, rg, model, enabled}
+func New(m *workspace.Manager, rg, model, apiKey, projectID string, enabled bool) *Handler {
+	return &Handler{
+		Workspaces:       m,
+		RGBinary:         rg,
+		WatsonxModel:     model,
+		WatsonxAPIKey:    apiKey,
+		WatsonxProjectID: projectID,
+		WatsonxEnabled:   enabled,
+	}
 }
 func (h *Handler) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -235,7 +244,7 @@ func (h *Handler) explain(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "invalid JSON")
 		return
 	}
-	client, e := llm.NewWatsonxClient(h.WatsonxModel, ws.Root, h.RGBinary)
+	client, e := llm.NewWatsonxClient(h.WatsonxModel, ws.Root, h.RGBinary, h.WatsonxAPIKey, h.WatsonxProjectID)
 	if e != nil {
 		fail(w, 500, e.Error())
 		return

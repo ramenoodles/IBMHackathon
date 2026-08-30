@@ -83,3 +83,34 @@ export function clearUserContext(): void {
   state.value = { ...defaultContext }
   sessionStorage.removeItem(STORAGE_KEY)
 }
+
+const LANG_ALIASES: Record<string, string> = {
+  'c/c++': 'cpp',
+  'c++': 'cpp',
+  'c#': 'csharp',
+  'cs': 'csharp',
+  'py': 'python',
+  'js': 'javascript',
+  'ts': 'typescript',
+  'rs': 'rust',
+}
+const VALID_LANGS = new Set(['auto', 'c', 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'rust', 'typescript'])
+
+function normalizeSingle(lang: string): string {
+  const key = lang.toLowerCase().trim()
+  if (VALID_LANGS.has(key)) return key
+  if (LANG_ALIASES[key]) return LANG_ALIASES[key]
+  return 'auto'
+}
+
+/**
+ * Map a stored language string to the best backend-safe value for the explain
+ * endpoint. Handles comma-separated multi-select values: returns the first
+ * non-auto language, or "auto" if all entries are unsupported.
+ *
+ * The backend accepts: auto, c, cpp, csharp, go, java, javascript, python, rust, typescript.
+ */
+export function normalizeLanguage(lang: string): string {
+  const candidates = lang.split(',').map((s) => normalizeSingle(s.trim()))
+  return candidates.find((v) => v !== 'auto') ?? 'auto'
+}

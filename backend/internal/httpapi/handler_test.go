@@ -39,7 +39,7 @@ def parent():
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler := New(manager, "rg", "", false).Handler()
+	handler := New(manager, "rg", "", "", "", false).Handler()
 
 	rootResponse := performJSON(t, handler, http.MethodPost, "/api/workspaces/"+ws.ID+"/graphs", map[string]any{
 		"filePath": "flow.py",
@@ -96,7 +96,7 @@ func TestGraphRootRequiresFilePath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	response := performJSON(t, New(manager, "rg", "", false).Handler(), http.MethodPost, "/api/workspaces/"+ws.ID+"/graphs", map[string]any{
+	response := performJSON(t, New(manager, "rg", "", "", "", false).Handler(), http.MethodPost, "/api/workspaces/"+ws.ID+"/graphs", map[string]any{
 		"symbol": "missingFile",
 	})
 	if response.Code != http.StatusBadRequest {
