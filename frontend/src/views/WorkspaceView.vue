@@ -395,6 +395,7 @@ function fileName(): string {
       :symbol="compactPreviewNode?.calleeSymbol ?? ''"
       :line="compactPreviewNode?.calleeLine"
       :user-context="userContext"
+      scan-only
       @close="compactPreviewOpen = false"
     />
   </div>

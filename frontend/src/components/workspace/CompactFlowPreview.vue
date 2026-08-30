@@ -9,14 +9,18 @@ import type { FlowEdge, FlowNode, GraphRootPayload } from '@/types/flowGraph'
 import { useFlowMermaid } from '@/composables/useFlowMermaid'
 import { enrichSymbolNodes } from '@/utils/flowGraphEnrich'
 
-const props = defineProps<{
-  open: boolean
-  workspaceId: string
-  filePath: string
-  symbol: string
-  line?: number
-  userContext: GraphRootPayload['userContext']
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    workspaceId: string
+    filePath: string
+    symbol: string
+    line?: number
+    userContext: GraphRootPayload['userContext']
+    scanOnly?: boolean
+  }>(),
+  { scanOnly: true },
+)
 
 const emit = defineEmits<{
   close: []
@@ -31,6 +35,10 @@ const mermaidContainer = ref<HTMLElement | null>(null)
 const { setContainer, renderError } = useFlowMermaid(
   () => nodes.value,
   () => edges.value,
+  '',
+  undefined,
+  undefined,
+  'scan',
 )
 
 watch(mermaidContainer, (el) => setContainer(el))
@@ -50,28 +58,31 @@ async function loadPreview(): Promise<void> {
     })
     nodes.value = graph.nodes
     edges.value = graph.edges
-    const state = {
-      allNodes: nodes.value.map((n) => ({ ...n })),
-      allEdges: [...edges.value],
-      rootId: graph.rootId,
-      revealedIds: new Set(graph.nodes.map((n) => n.id)),
-      enrichedIds: new Set<string>(),
-      isMock: Boolean(graph.mock),
-      parentPath: [],
-      fullyExpanded: false,
+
+    if (!props.scanOnly) {
+      const state = {
+        allNodes: nodes.value.map((n) => ({ ...n })),
+        allEdges: [...edges.value],
+        rootId: graph.rootId,
+        revealedIds: new Set(graph.nodes.map((n) => n.id)),
+        enrichedIds: new Set<string>(),
+        isMock: Boolean(graph.mock),
+        parentPath: [],
+        fullyExpanded: false,
+      }
+      void enrichSymbolNodes(
+        state,
+        {
+          workspaceId: props.workspaceId,
+          filePath: props.filePath,
+          symbol: props.symbol,
+          userContext: props.userContext,
+        },
+        graph.nodes.map((n) => n.id),
+      ).then(() => {
+        nodes.value = state.allNodes
+      })
     }
-    void enrichSymbolNodes(
-      state,
-      {
-        workspaceId: props.workspaceId,
-        filePath: props.filePath,
-        symbol: props.symbol,
-        userContext: props.userContext,
-      },
-      graph.nodes.map((n) => n.id),
-    ).then(() => {
-      nodes.value = state.allNodes
-    })
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load compacted flow'
   } finally {
@@ -80,7 +91,7 @@ async function loadPreview(): Promise<void> {
 }
 
 watch(
-  () => [props.open, props.filePath, props.symbol] as const,
+  () => [props.open, props.filePath, props.symbol, props.scanOnly] as const,
   () => {
     if (props.open) void loadPreview()
   },
@@ -91,7 +102,7 @@ watch(
 <template>
   <Modal
     :open="open"
-    :title="`Preview: ${symbol}()`"
+    :title="`Code flow: ${symbol}()`"
     size="xl"
     @close="emit('close')"
   >
@@ -99,7 +110,7 @@ watch(
       <p v-if="filePath" class="mb-3 shrink-0 font-mono text-xs text-slate-500">
         {{ filePath }}<span v-if="line">:{{ line }}</span>
       </p>
-      <p v-if="loading" class="py-8 text-center text-sm text-slate-400">Loading compacted flow…</p>
+      <p v-if="loading" class="py-8 text-center text-sm text-slate-400">Loading code flow…</p>
       <p v-else-if="error" class="py-8 text-center text-sm text-red-400">{{ error }}</p>
       <p v-else-if="renderError" class="py-8 text-center text-sm text-red-400">{{ renderError }}</p>
       <div
@@ -112,7 +123,7 @@ watch(
         />
       </div>
       <p class="mt-3 shrink-0 text-xs text-slate-500">
-        Read-only preview. Click the compact node in the main flow to inline-expand.
+        Read-only · scan labels (no AI)
       </p>
     </div>
   </Modal>

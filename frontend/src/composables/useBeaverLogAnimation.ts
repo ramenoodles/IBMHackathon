@@ -1,13 +1,14 @@
 import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 
-export const BEAVER_LOG_START_X = 220
-export const BEAVER_LOG_END_X = 980
+export const BEAVER_LOG_START_X = 180
+export const BEAVER_LOG_END_X = 1020
 export const BEAVER_LOG_TOTAL_TRAVEL = BEAVER_LOG_END_X - BEAVER_LOG_START_X
-const BEAVER_OFFSET_X = -50
-const BEAVER_BASE_Y = 252
-const MAX_SHAVINGS = 50
-const CHIP_COUNT = 32
-const chipColors = ['#faeed7', '#e6c49c', '#cca06f', '#8d562c', '#6a3d1c', '#ffe8cc']
+const BEAVER_OFFSET_X = -54
+const BEAVER_BASE_Y = 212
+const BEAVER_NOTCH_Y = 350
+const MAX_SHAVINGS = 60
+const CHIP_COUNT = 36
+const chipColors = ['#fdf3e2', '#ebd0a9', '#d4aa79', '#875127', '#5a3015', '#fff0dc']
 
 export type BeaverLogAnimationMode = 'timed' | 'progress' | 'indeterminate'
 
@@ -70,7 +71,7 @@ export function useBeaverLogAnimation(options: UseBeaverLogAnimationOptions) {
 
     for (let i = 0; i < CHIP_COUNT; i++) {
       const p = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
-      p.setAttribute('points', i % 2 === 0 ? '-4,-2 4,-4 2,3 -3,3' : '-3,-3 4,-1 1,4 -3,2')
+      p.setAttribute('points', i % 2 === 0 ? '-5,-3 5,-5 3,4 -4,4' : '-4,-4 5,-1 2,5 -4,2')
       p.setAttribute('fill', chipColors[i % chipColors.length]!)
       p.setAttribute('opacity', '0')
       chipsLayer.value.appendChild(p)
@@ -91,15 +92,15 @@ export function useBeaverLogAnimation(options: UseBeaverLogAnimationOptions) {
 
     for (let i = 0; i < MAX_SHAVINGS; i++) {
       const sh = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse')
-      sh.setAttribute('rx', (Math.random() * 3.5 + 2).toFixed(1))
-      sh.setAttribute('ry', (Math.random() * 1.8 + 0.8).toFixed(1))
+      sh.setAttribute('rx', (Math.random() * 4 + 2).toFixed(1))
+      sh.setAttribute('ry', (Math.random() * 2 + 0.9).toFixed(1))
       sh.setAttribute('fill', chipColors[Math.floor(Math.random() * chipColors.length)]!)
       sh.setAttribute('opacity', '0')
       shavingsGroup.value.appendChild(sh)
       shavings.push({
         el: sh,
         x: 0,
-        y: 416 + Math.random() * 8,
+        y: 395 + Math.random() * 10,
         rot: Math.random() * 360,
         revealed: false,
       })
@@ -110,15 +111,15 @@ export function useBeaverLogAnimation(options: UseBeaverLogAnimationOptions) {
     const chip = chipPool.find((c) => !c.active)
     if (!chip) return
     chip.active = true
-    chip.x = originX + (Math.random() * 8 - 4)
-    chip.y = originY + (Math.random() * 14 - 7)
-    chip.vx = -(Math.random() * 4 + 2)
-    chip.vy = Math.random() * 5.5 - 3.2
+    chip.x = originX + (Math.random() * 10 - 5)
+    chip.y = originY + (Math.random() * 18 - 9)
+    chip.vx = -(Math.random() * 4.5 + 2.5)
+    chip.vy = Math.random() * 6 - 3.5
     chip.rot = Math.random() * 360
-    chip.vRot = Math.random() * 24 - 12
-    chip.scale = Math.random() * 0.6 + 0.65
+    chip.vRot = Math.random() * 28 - 14
+    chip.scale = Math.random() * 0.6 + 0.7
     chip.life = 0
-    chip.maxLife = Math.random() * 0.4 + 0.35
+    chip.maxLife = Math.random() * 0.45 + 0.35
     chip.el.setAttribute('opacity', '1')
   }
 
@@ -190,13 +191,13 @@ export function useBeaverLogAnimation(options: UseBeaverLogAnimationOptions) {
 
     if (beaverRig.value && beaverBobbing.value) {
       const beaverX = cutX + BEAVER_OFFSET_X
-      const chewBobY = chewing ? Math.sin(now * 0.038) * 3.2 : 0
-      const chewBobRot = chewing ? Math.cos(now * 0.038) * 2.0 : 0
-      const chewScaleX = chewing ? 1 + Math.sin(now * 0.076) * 0.02 : 1
+      const chewBobY = chewing ? Math.sin(now * 0.04) * 3.5 : 0
+      const chewBobRot = chewing ? Math.cos(now * 0.04) * 2.4 : 0
+      const chewScaleX = chewing ? 1 + Math.sin(now * 0.08) * 0.025 : 1
       beaverRig.value.setAttribute('transform', `translate(${beaverX}, ${BEAVER_BASE_Y})`)
       beaverBobbing.value.setAttribute(
         'transform',
-        `translate(0, ${chewBobY}) rotate(${chewBobRot} 65 75) scale(${chewScaleX} 1)`,
+        `translate(0, ${chewBobY}) rotate(${chewBobRot} 72 80) scale(${chewScaleX} 1)`,
       )
     }
 
@@ -209,16 +210,16 @@ export function useBeaverLogAnimation(options: UseBeaverLogAnimationOptions) {
       gnawedClipRect.value.setAttribute('width', String(Math.max(0, cutX - BEAVER_LOG_START_X + 5)))
     }
     if (activeNotch.value) {
-      activeNotch.value.setAttribute('transform', `translate(${cutX}, 380)`)
+      activeNotch.value.setAttribute('transform', `translate(${cutX}, ${BEAVER_NOTCH_Y})`)
       activeNotch.value.setAttribute('opacity', chewing ? '1' : '0')
     }
 
     if (chewing) {
       spawnCounter += dt
-      if (spawnCounter > 0.045) {
+      if (spawnCounter > 0.04) {
         spawnCounter = 0
-        spawnWoodChip(cutX - 10, 380)
-        spawnWoodChip(cutX - 4, 376)
+        spawnWoodChip(cutX - 12, BEAVER_NOTCH_Y)
+        spawnWoodChip(cutX - 5, BEAVER_NOTCH_Y - 5)
       }
     }
 
@@ -230,7 +231,7 @@ export function useBeaverLogAnimation(options: UseBeaverLogAnimationOptions) {
         chip.el.setAttribute('opacity', '0')
         continue
       }
-      chip.vy += 22 * dt
+      chip.vy += 24 * dt
       chip.x += chip.vx
       chip.y += chip.vy
       chip.rot += chip.vRot
@@ -247,11 +248,11 @@ export function useBeaverLogAnimation(options: UseBeaverLogAnimationOptions) {
       const sh = shavings[i]!
       if (i < revealCount && !sh.revealed) {
         sh.revealed = true
-        sh.x = BEAVER_LOG_START_X + (i / MAX_SHAVINGS) * BEAVER_LOG_TOTAL_TRAVEL + (Math.random() * 20 - 10)
+        sh.x = BEAVER_LOG_START_X + (i / MAX_SHAVINGS) * BEAVER_LOG_TOTAL_TRAVEL + (Math.random() * 24 - 12)
         sh.el.setAttribute('cx', sh.x.toFixed(1))
         sh.el.setAttribute('cy', sh.y.toFixed(1))
         sh.el.setAttribute('transform', `rotate(${sh.rot.toFixed(1)} ${sh.x.toFixed(1)} ${sh.y.toFixed(1)})`)
-        sh.el.setAttribute('opacity', '0.75')
+        sh.el.setAttribute('opacity', '0.8')
       }
     }
 

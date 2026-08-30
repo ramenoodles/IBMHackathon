@@ -57,6 +57,17 @@ export function nodeDisplayTitle(node: FlowNode): string {
   return node.label.replace(/^L\d+\s+/, '')
 }
 
+/** Raw scan label from the CFG — ignores enriched title/summary. */
+export function nodeScanTitle(node: FlowNode): string {
+  return node.label.replace(/^L\d+\s+/, '')
+}
+
+export type MermaidLabelMode = 'display' | 'scan'
+
+function nodeMermaidLabel(node: FlowNode, labelMode: MermaidLabelMode): string {
+  return labelMode === 'scan' ? nodeScanTitle(node) : nodeDisplayTitle(node)
+}
+
 function looksLikeCode(text: string): boolean {
   return /[{}"'`;=]/.test(text) || text.startsWith('return ')
 }
@@ -89,7 +100,11 @@ export function graphLabelKey(nodes: FlowNode[]): string {
     .join('|')
 }
 
-export function compileToMermaid(nodes: FlowNode[], edges: FlowEdge[]): string {
+export function compileToMermaid(
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+  labelMode: MermaidLabelMode = 'display',
+): string {
   if (nodes.length === 0) return ''
 
   const indexById = new Map(nodes.map((n, i) => [n.id, i]))
@@ -105,7 +120,7 @@ export function compileToMermaid(nodes: FlowNode[], edges: FlowEdge[]): string {
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i]!
     const mid = mermaidNodeId(i)
-    const safe = escapeMermaidLabel(nodeDisplayTitle(node))
+    const safe = escapeMermaidLabel(nodeMermaidLabel(node, labelMode))
     if (node.kind === 'branch') {
       lines.push(`  ${mid}{"${safe}"}`)
     } else {
@@ -224,6 +239,7 @@ export function useFlowMermaid(
   selectedNodeId: MaybeRefOrGetter<string> = '',
   onNodeClick?: (node: FlowNode) => void,
   onRender?: (reason: FlowRenderReason) => void,
+  labelMode: MermaidLabelMode = 'display',
 ) {
   const mermaidCode = ref('')
   const renderError = ref<string | null>(null)
@@ -235,7 +251,7 @@ export function useFlowMermaid(
   async function renderStructural(): Promise<void> {
     const nodeList = toValue(nodes)
     const edgeList = toValue(edges)
-    mermaidCode.value = compileToMermaid(nodeList, edgeList)
+    mermaidCode.value = compileToMermaid(nodeList, edgeList, labelMode)
     if (!containerRef.value || !mermaidCode.value) return
     try {
       renderError.value = null

@@ -82,100 +82,99 @@ const statusText = computed(() => currentStage.value?.text ?? '')
       <svg class="main-svg" viewBox="0 0 1200 700" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
         <defs>
           <linearGradient :id="`${uid}-barkGrad`" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#734120" />
-            <stop offset="12%" stop-color="#8a502c" />
-            <stop offset="35%" stop-color="#552c13" />
-            <stop offset="75%" stop-color="#3d1e0c" />
-            <stop offset="100%" stop-color="#241105" />
+            <stop offset="0%" stop-color="#784421" />
+            <stop offset="15%" stop-color="#8f5228" />
+            <stop offset="40%" stop-color="#5a3015" />
+            <stop offset="78%" stop-color="#3d1d0a" />
+            <stop offset="100%" stop-color="#241004" />
           </linearGradient>
           <linearGradient :id="`${uid}-gnawedGrad`" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#faeed7" />
-            <stop offset="25%" stop-color="#e6c49c" />
-            <stop offset="70%" stop-color="#cca06f" />
-            <stop offset="100%" stop-color="#a47543" />
+            <stop offset="0%" stop-color="#fdf3e2" />
+            <stop offset="28%" stop-color="#ebd0a9" />
+            <stop offset="70%" stop-color="#d4aa79" />
+            <stop offset="100%" stop-color="#ad7c48" />
           </linearGradient>
           <linearGradient :id="`${uid}-biteWoodGrad`" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#ffe8cc" />
-            <stop offset="100%" stop-color="#d4a373" />
+            <stop offset="0%" stop-color="#fff0dc" />
+            <stop offset="100%" stop-color="#d8a873" />
           </linearGradient>
-          <filter :id="`${uid}-logShadow`" x="-5%" y="-30%" width="110%" height="180%">
-            <feDropShadow dx="0" dy="16" stdDeviation="10" flood-color="#251307" flood-opacity="0.35" />
+          <filter :id="`${uid}-softShadow`" x="-10%" y="-40%" width="120%" height="200%">
+            <feGaussianBlur stdDeviation="8" result="blur" />
+            <feColorMatrix type="matrix" values="0 0 0 0 0.18  0 0 0 0 0.1  0 0 0 0 0.05  0 0 0 0.16 0" />
           </filter>
           <clipPath :id="`${uid}-intactClip`">
-            <rect ref="intactClipRect" x="220" y="340" width="760" height="80" />
+            <rect ref="intactClipRect" x="180" y="280" width="840" height="140" />
           </clipPath>
           <clipPath :id="`${uid}-gnawedClip`">
-            <rect ref="gnawedClipRect" x="215" y="340" width="0" height="80" />
+            <rect ref="gnawedClipRect" x="175" y="280" width="0" height="140" />
           </clipPath>
-          <pattern :id="`${uid}-barkTexture`" width="80" height="48" patternUnits="userSpaceOnUse">
-            <path d="M 0 10 Q 20 12 40 8 T 80 11" stroke="#3d1d0a" stroke-width="1.2" fill="none" opacity="0.4" stroke-linecap="round" />
-            <path d="M 10 24 Q 30 20 50 26 T 90 22" stroke="#341706" stroke-width="1.4" fill="none" opacity="0.45" stroke-linecap="round" />
-            <path d="M 0 38 Q 25 41 45 35 T 80 39" stroke="#250e03" stroke-width="1.2" fill="none" opacity="0.5" stroke-linecap="round" />
+          <pattern :id="`${uid}-barkTexture`" width="90" height="60" patternUnits="userSpaceOnUse">
+            <path d="M 0 12 Q 22 15 45 10 T 90 13" stroke="#3d1d0a" stroke-width="1.6" fill="none" opacity="0.4" stroke-linecap="round" />
+            <path d="M 12 30 Q 35 25 58 32 T 102 28" stroke="#311403" stroke-width="1.8" fill="none" opacity="0.45" stroke-linecap="round" />
+            <path d="M 0 48 Q 28 52 52 44 T 90 49" stroke="#220b01" stroke-width="1.6" fill="none" opacity="0.5" stroke-linecap="round" />
           </pattern>
         </defs>
 
-        <g opacity="0.4">
-          <line x1="180" y1="416" x2="1020" y2="416" stroke="#334155" stroke-width="2" stroke-dasharray="4 6" />
-        </g>
+        <ellipse cx="600" cy="402" rx="440" ry="14" fill="#000000" opacity="0.06" :filter="`url(#${uid}-softShadow)`" />
 
         <g ref="shavingsGroup" />
 
-        <g :filter="`url(#${uid}-logShadow)`">
+        <g>
           <g :clip-path="`url(#${uid}-gnawedClip)`">
             <path
-              d="M 220 372 L 240 370 L 260 374 L 280 369 L 300 373 L 320 368 L 340 374 L 360 370 L 380 373 L 400 368 L 420 374 L 440 369 L 460 373 L 480 369 L 500 374 L 520 368 L 540 374 L 560 369 L 580 373 L 600 368 L 620 374 L 640 369 L 660 373 L 680 369 L 700 374 L 720 368 L 740 374 L 760 369 L 780 373 L 800 369 L 820 374 L 840 368 L 860 374 L 880 369 L 900 373 L 920 369 L 940 374 L 960 369 L 980 372 L 980 388 L 960 391 L 940 386 L 920 391 L 900 387 L 880 392 L 860 386 L 840 391 L 820 386 L 800 391 L 780 387 L 760 392 L 740 386 L 720 391 L 700 387 L 680 392 L 660 386 L 640 391 L 620 387 L 600 392 L 580 386 L 560 391 L 540 387 L 520 392 L 500 386 L 480 391 L 460 387 L 440 392 L 420 386 L 400 391 L 380 387 L 360 392 L 340 386 L 320 391 L 300 387 L 280 392 L 260 386 L 240 391 L 220 388 Z"
+              d="M 180 339 L 205 336 L 230 341 L 255 336 L 280 340 L 305 335 L 330 341 L 355 336 L 380 340 L 405 335 L 430 341 L 455 336 L 480 340 L 505 335 L 530 341 L 555 336 L 580 340 L 605 335 L 630 341 L 655 336 L 680 340 L 705 335 L 730 341 L 755 336 L 780 340 L 805 335 L 830 341 L 855 336 L 880 340 L 905 335 L 930 341 L 955 336 L 980 340 L 1005 336 L 1020 339 L 1020 361 L 1005 364 L 980 359 L 955 365 L 930 360 L 905 365 L 880 359 L 855 364 L 830 359 L 805 365 L 780 360 L 755 365 L 730 359 L 705 364 L 680 359 L 655 365 L 630 360 L 605 365 L 580 359 L 555 364 L 530 359 L 505 365 L 480 360 L 455 365 L 430 359 L 405 364 L 380 359 L 355 365 L 330 360 L 305 365 L 280 359 L 255 364 L 230 359 L 205 364 L 180 361 Z"
               :fill="`url(#${uid}-gnawedGrad)`"
-              stroke="#8d562c"
-              stroke-width="1.2"
+              stroke="#875127"
+              stroke-width="1.5"
             />
-            <g stroke="#9c6436" stroke-width="1.2" opacity="0.6" stroke-linecap="round">
-              <path d="M 235 371 L 238 387 M 275 370 L 278 386 M 315 370 L 318 387 M 355 371 L 358 386 M 395 370 L 398 387 M 435 370 L 438 386 M 475 370 L 478 387 M 515 370 L 518 386 M 555 370 L 558 387 M 595 370 L 598 386 M 635 371 L 638 387 M 675 370 L 678 386 M 715 370 L 718 387 M 755 370 L 758 386 M 795 370 L 798 387 M 835 370 L 838 386 M 875 370 L 878 387 M 915 370 L 918 386 M 955 370 L 958 387" />
+            <g stroke="#9c6334" stroke-width="1.4" opacity="0.6" stroke-linecap="round">
+              <path d="M 195 338 L 198 360 M 240 337 L 243 359 M 285 337 L 288 360 M 330 338 L 333 359 M 375 337 L 378 360 M 420 337 L 423 359 M 465 337 L 468 360 M 510 337 L 513 359 M 555 337 L 558 360 M 600 337 L 603 359 M 645 338 L 648 360 M 690 337 L 693 359 M 735 337 L 738 360 M 780 337 L 783 360 M 825 337 L 828 360 M 870 337 L 873 360 M 915 337 L 918 360 M 960 337 L 963 360 M 1005 337 L 1008 360" />
             </g>
-            <path d="M 220 375 L 980 375" stroke="#fff" stroke-width="1" opacity="0.35" stroke-dasharray="8 6" />
+            <line x1="180" y1="344" x2="1020" y2="344" stroke="#ffffff" stroke-width="1.2" opacity="0.45" stroke-dasharray="10 8" />
           </g>
 
           <g :clip-path="`url(#${uid}-intactClip)`">
-            <rect x="220" y="356" width="760" height="48" rx="4" :fill="`url(#${uid}-barkGrad)`" />
-            <rect x="220" y="356" width="760" height="48" :fill="`url(#${uid}-barkTexture)`" opacity="0.8" />
-            <line x1="222" y1="358" x2="978" y2="358" stroke="#a25b30" stroke-width="2" stroke-linecap="round" opacity="0.9" />
-            <line x1="222" y1="402" x2="978" y2="402" stroke="#180a02" stroke-width="2.5" stroke-linecap="round" />
-            <g opacity="0.75">
-              <ellipse cx="430" cy="380" rx="4" ry="7" fill="#2d1305" />
-              <ellipse cx="690" cy="374" rx="3.5" ry="6" fill="#2d1305" />
-              <ellipse cx="880" cy="384" rx="4" ry="7" fill="#2d1305" />
+            <rect x="180" y="320" width="840" height="60" rx="5" :fill="`url(#${uid}-barkGrad)`" />
+            <rect x="180" y="320" width="840" height="60" rx="5" :fill="`url(#${uid}-barkTexture)`" opacity="0.85" />
+            <line x1="182" y1="322" x2="1018" y2="322" stroke="#b06437" stroke-width="2.5" stroke-linecap="round" opacity="0.9" />
+            <line x1="182" y1="378" x2="1018" y2="378" stroke="#170902" stroke-width="3" stroke-linecap="round" />
+            <g opacity="0.7">
+              <ellipse cx="380" cy="350" rx="5" ry="8" fill="#2b1104" />
+              <ellipse cx="680" cy="344" rx="4" ry="7" fill="#2b1104" />
+              <ellipse cx="890" cy="356" rx="5" ry="9" fill="#2b1104" />
             </g>
           </g>
 
           <g>
-            <rect x="218" y="356" width="4" height="48" rx="2" fill="#8d562c" />
-            <line x1="220" y1="356" x2="220" y2="404" stroke="#e0be92" stroke-width="2" stroke-linecap="round" opacity="0.8" />
+            <rect x="177" y="320" width="5" height="60" rx="2" fill="#875127" />
+            <line x1="180" y1="320" x2="180" y2="380" stroke="#ebd0a9" stroke-width="2.2" stroke-linecap="round" opacity="0.85" />
           </g>
           <g>
-            <rect x="978" y="356" width="4" height="48" rx="2" fill="#8d562c" />
-            <line x1="980" y1="356" x2="980" y2="404" stroke="#e0be92" stroke-width="2" stroke-linecap="round" opacity="0.8" />
+            <rect x="1018" y="320" width="5" height="60" rx="2" fill="#875127" />
+            <line x1="1020" y1="320" x2="1020" y2="380" stroke="#ebd0a9" stroke-width="2.2" stroke-linecap="round" opacity="0.85" />
           </g>
 
-          <g ref="activeNotch" transform="translate(220, 380)">
-            <path d="M -16 -24 L 2 -8 L 8 0 L 2 8 L -16 24 Z" :fill="`url(#${uid}-biteWoodGrad)`" stroke="#8d562c" stroke-width="1.2" />
-            <polygon points="-8,-14 0,-11 -5,-8" fill="#fff5ea" />
-            <polygon points="-2,-4 6,0 -2,4" fill="#fff5ea" />
-            <polygon points="-8,8 0,11 -5,14" fill="#fff5ea" />
+          <g ref="activeNotch" transform="translate(180, 350)">
+            <path d="M -22 -30 L 2 -11 L 10 0 L 2 11 L -22 30 Z" :fill="`url(#${uid}-biteWoodGrad)`" stroke="#875127" stroke-width="1.5" />
+            <polygon points="-12,-18 -1,-14 -7,-10" fill="#ffffff" />
+            <polygon points="-3,-5 8,0 -3,5" fill="#ffffff" />
+            <polygon points="-12,10 -1,14 -7,18" fill="#ffffff" />
           </g>
         </g>
 
         <g ref="chipsLayer" />
 
-        <g ref="beaverRig" transform="translate(170, 252)">
+        <g ref="beaverRig" transform="translate(126, 212)">
           <g ref="beaverBobbing">
-            <image :href="logo" x="0" y="0" width="135" height="135" preserveAspectRatio="xMidYMid meet" />
-            <g transform="translate(42, 108)">
-              <circle cx="0" cy="0" r="2.2" fill="#f59e0b" opacity="0.9" />
-              <circle cx="12" cy="4" r="1.6" fill="#fbbf24" opacity="0.8" />
+            <image :href="logo" x="0" y="0" width="145" height="145" preserveAspectRatio="xMidYMid meet" />
+            <g transform="translate(46, 116)">
+              <circle cx="0" cy="0" r="2.5" fill="#f59e0b" opacity="0.9" />
+              <circle cx="14" cy="4" r="1.8" fill="#fbbf24" opacity="0.8" />
             </g>
           </g>
         </g>
 
-        <g v-if="!compact || barOnly" opacity="0.6">
+        <g v-if="!compact && !barOnly" opacity="0.6">
           <g transform="translate(410, 424)">
             <line x1="0" y1="0" x2="0" y2="6" stroke="#64748b" stroke-width="1.5" stroke-linecap="round" />
             <text x="0" y="18" font-size="11" font-weight="700" fill="#64748b" text-anchor="middle" font-family="ui-monospace, monospace">25%</text>

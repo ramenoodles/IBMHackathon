@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { compileToMermaid, graphLabelKey, graphStructureKey, nodeMermaidClasses } from '@/composables/useFlowMermaid'
+import { compileToMermaid, graphLabelKey, graphStructureKey, nodeMermaidClasses, nodeScanTitle } from '@/composables/useFlowMermaid'
 import type { FlowNode } from '@/types/flowGraph'
 
 const baseNode = (id: string, overrides: Partial<FlowNode> = {}): FlowNode => ({
@@ -42,6 +42,20 @@ describe('compileToMermaid', () => {
     expect(nodeMermaidClasses(baseNode('a', { labelSource: 'ai' }))).toEqual(['inferred'])
     expect(nodeMermaidClasses(baseNode('a', { labelSource: 'heuristic' }))).toEqual(['heuristic'])
     expect(nodeMermaidClasses(baseNode('a', { labelSource: 'ai', collapsed: true }))).toEqual(['collapsed'])
+  })
+
+  it('uses scan labels when labelMode is scan', () => {
+    const nodes = [
+      baseNode('a', {
+        label: 'L12 m.mu.Lock()',
+        title: 'Acquire lock',
+        summary: 'Locks the mutex',
+      }),
+    ]
+    expect(nodeScanTitle(nodes[0]!)).toBe('m.mu.Lock()')
+    const code = compileToMermaid(nodes, [], 'scan')
+    expect(code).toContain('m.mu.Lock()')
+    expect(code).not.toContain('Acquire lock')
   })
 
   it('separates structure and label keys', () => {
