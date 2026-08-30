@@ -200,14 +200,6 @@ function openDeepDive(): void {
   emit('requestDetail', selectedNode.value)
 }
 
-const showExpandHint = computed(
-  () =>
-    !props.fullyExpanded &&
-    !props.mappingFullFlow &&
-    props.nodes.length === 1 &&
-    props.rootId &&
-    props.hasHiddenChildren(props.rootId),
-)
 </script>
 
 <template>
@@ -233,12 +225,12 @@ const showExpandHint = computed(
 
       <template v-else>
         <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-2">
-          <p class="text-sm text-slate-500">
-            Tracing <span class="font-mono text-slate-300">{{ symbol }}</span>
-            <span v-if="mappingFullFlow" class="ml-2 text-onbober-primary">Mapping full flow...</span>
-            <span v-else-if="expanding" class="ml-2 text-onbober-primary">Expanding...</span>
-          </p>
+          <span class="text-xs text-slate-600">
+            {{ nodes.length }} step{{ nodes.length !== 1 ? 's' : '' }}
+          </span>
           <div class="flex items-center gap-3">
+            <span v-if="mappingFullFlow" class="text-xs text-onbober-primary">Mapping full flow...</span>
+            <span v-else-if="expanding" class="text-xs text-onbober-primary">Expanding...</span>
             <div class="flex items-center gap-1">
               <button
                 type="button"
@@ -306,10 +298,6 @@ const showExpandHint = computed(
             </button>
           </div>
         </div>
-
-        <p v-if="showExpandHint" class="shrink-0 border-b border-slate-800 bg-slate-900/60 px-4 py-2 text-sm text-slate-400">
-          Click the entry step to reveal the next part of the flow.
-        </p>
 
         <p v-if="error" class="shrink-0 px-4 py-2 text-sm text-red-400">{{ error }}</p>
 

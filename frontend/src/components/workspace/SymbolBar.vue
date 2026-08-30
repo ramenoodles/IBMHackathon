@@ -1,64 +1,77 @@
 <script setup lang="ts">
 /**
- * Horizontal symbol picker — purely presentational.
- * The parent controls which page of symbols is shown via symbolNames.
+ * Horizontal symbol picker — scrollable chip row with arrow buttons.
+ * No pagination. Arrow buttons appear only when there is overflow in that
+ * direction. Active chip scrolls into view automatically.
  */
-import { computed, ref } from 'vue'
+import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps<{
   workspaceId: string
   filePath: string
   activeSymbol: string
-  symbolNames?: string[]
-  hasNextPage?: boolean
-  hasPrevPage?: boolean
-  currentPage?: number
-  totalPages?: number
+  allSymbols?: string[]
   visible?: boolean
 }>()
 
 const emit = defineEmits<{
   pick: [symbol: string]
-  nextPage: []
-  prevPage: []
-  goToPage: [page: number]
 }>()
 
-// 0-based internally, display is 1-based
-const page = computed(() => props.currentPage ?? 0)
-const total = computed(() => props.totalPages ?? 1)
+const scrollEl = ref<HTMLElement | null>(null)
+const canScrollLeft = ref(false)
+const canScrollRight = ref(false)
 
-/** Up to 5 page numbers centred around current page. */
-const pageWindow = computed<number[]>(() => {
-  if (total.value <= 0) return []
-  const WINDOW = 5
-  const half = Math.floor(WINDOW / 2)
-  let start = Math.max(0, page.value - half)
-  let end = Math.min(total.value - 1, start + WINDOW - 1)
-  // shift window left if at the end
-  if (end - start < WINDOW - 1) start = Math.max(0, end - WINDOW + 1)
-  const pages: number[] = []
-  for (let i = start; i <= end; i++) pages.push(i)
-  return pages
+const SCROLL_STEP = 240
+
+function updateScrollState(): void {
+  const el = scrollEl.value
+  if (!el) return
+  canScrollLeft.value = el.scrollLeft > 1
+  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+}
+
+function scrollLeft(): void {
+  scrollEl.value?.scrollBy({ left: -SCROLL_STEP, behavior: 'smooth' })
+  setTimeout(updateScrollState, 320)
+}
+
+function scrollRight(): void {
+  scrollEl.value?.scrollBy({ left: SCROLL_STEP, behavior: 'smooth' })
+  setTimeout(updateScrollState, 320)
+}
+
+// Scroll the active chip into view whenever it changes
+watch(
+  () => props.activeSymbol,
+  () => {
+    void nextTick(() => {
+      const el = scrollEl.value?.querySelector<HTMLElement>('[data-active="true"]')
+      el?.scrollIntoView({ inline: 'nearest', block: 'nearest' })
+      updateScrollState()
+    })
+  },
+  { immediate: true },
+)
+
+// Re-evaluate overflow when symbol list changes (e.g. file switch)
+watch(() => props.allSymbols, () => void nextTick(updateScrollState))
+
+let ro: ResizeObserver | null = null
+
+onMounted(() => {
+  const el = scrollEl.value
+  if (!el) return
+  updateScrollState()
+  el.addEventListener('scroll', updateScrollState, { passive: true })
+  ro = new ResizeObserver(updateScrollState)
+  ro.observe(el)
 })
 
-const inputValue = ref('')
-const inputFocused = ref(false)
-
-function onInputKeydown(e: KeyboardEvent): void {
-  if (e.key !== 'Enter') return
-  const n = parseInt(inputValue.value, 10)
-  if (!isNaN(n) && n >= 1 && n <= total.value) {
-    emit('goToPage', n - 1) // convert to 0-based
-  }
-  inputValue.value = ''
-  ;(e.target as HTMLInputElement).blur()
-}
-
-function onInputBlur(): void {
-  inputFocused.value = false
-  inputValue.value = ''
-}
+onUnmounted(() => {
+  scrollEl.value?.removeEventListener('scroll', updateScrollState)
+  ro?.disconnect()
+})
 </script>
 
 <template>
@@ -66,88 +79,57 @@ function onInputBlur(): void {
     class="symbolbar-wrap"
     :class="visible ? 'symbolbar-visible' : 'symbolbar-hidden'"
   >
-  <div class="symbolbar-inner">
-  <div v-if="filePath" class="flex items-center gap-2 border-b border-slate-800 bg-slate-900/80 px-4 py-2.5">
-    <span class="shrink-0 text-sm font-medium text-slate-400">Trace</span>
+    <div class="symbolbar-inner">
+      <div v-if="filePath" class="flex items-center border-b border-slate-800 bg-slate-900/80">
+        <span class="shrink-0 px-3 text-xs text-slate-500">Trace</span>
 
-    <!-- Symbol buttons -->
-    <div class="symbol-scroll flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-0.5">
-      <button
-        v-for="fn in symbolNames"
-        :key="fn"
-        type="button"
-        class="shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition"
-        :class="
-          activeSymbol === fn
-            ? 'bg-onbober-primary text-white'
-            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-        "
-        @click="emit('pick', fn)"
-      >
-        {{ fn }}
-      </button>
-      <span v-if="!symbolNames?.length" class="text-sm text-slate-500">No symbols on this page</span>
+        <!-- Left arrow — always in flow, invisible when not needed to avoid layout shift -->
+        <button
+          type="button"
+          class="scroll-arrow shrink-0"
+          :class="canScrollLeft ? '' : 'invisible'"
+          aria-label="Scroll left"
+          :tabindex="canScrollLeft ? 0 : -1"
+          @click="scrollLeft"
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg>
+        </button>
+
+        <!-- Chip scroll area -->
+        <div class="relative min-w-0 flex-1">
+          <div ref="scrollEl" class="chip-track flex gap-1.5 overflow-x-auto px-1 py-2">
+            <button
+              v-for="sym in allSymbols"
+              :key="sym"
+              type="button"
+              class="shrink-0 rounded-md px-3 py-1 text-xs font-medium transition"
+              :class="
+                activeSymbol === sym
+                  ? 'bg-onbober-primary text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+              "
+              :data-active="activeSymbol === sym ? 'true' : undefined"
+              @click="emit('pick', sym)"
+            >
+              {{ sym }}
+            </button>
+            <span v-if="!allSymbols?.length" class="py-1 text-xs text-slate-600">No symbols</span>
+          </div>
+        </div>
+
+        <!-- Right arrow — always in flow, invisible when not needed -->
+        <button
+          type="button"
+          class="scroll-arrow shrink-0"
+          :class="canScrollRight ? '' : 'invisible'"
+          aria-label="Scroll right"
+          :tabindex="canScrollRight ? 0 : -1"
+          @click="scrollRight"
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
+        </button>
+      </div>
     </div>
-
-    <!-- Pagination control -->
-    <div v-if="filePath" class="flex shrink-0 items-center gap-0.5 rounded-lg border border-slate-700 bg-slate-900 px-1 py-0.5">
-      <!-- Prev arrow -->
-      <button
-        type="button"
-        class="rounded px-2 py-1 text-sm text-slate-400 transition disabled:cursor-not-allowed disabled:opacity-30 hover:enabled:bg-slate-700 hover:enabled:text-slate-200"
-        :disabled="!hasPrevPage"
-        title="Previous page"
-        @click="emit('prevPage')"
-      >
-        ‹
-      </button>
-
-      <!-- Page number buttons -->
-      <button
-        v-for="p in pageWindow"
-        :key="p"
-        type="button"
-        class="min-w-[26px] rounded px-2 py-1 text-sm font-medium transition"
-        :class="
-          p === page
-            ? 'bg-onbober-primary text-white'
-            : 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
-        "
-        :title="`Page ${p + 1}`"
-        @click="emit('goToPage', p)"
-      >
-        {{ p + 1 }}
-      </button>
-
-      <!-- Next arrow -->
-      <button
-        type="button"
-        class="rounded px-2 py-1 text-sm text-slate-400 transition disabled:cursor-not-allowed disabled:opacity-30 hover:enabled:bg-slate-700 hover:enabled:text-slate-200"
-        :disabled="!hasNextPage"
-        title="Next page"
-        @click="emit('nextPage')"
-      >
-        ›
-      </button>
-
-      <!-- Divider -->
-      <span class="mx-1 text-slate-700">|</span>
-
-      <!-- Direct page entry -->
-      <input
-        v-model="inputValue"
-        type="text"
-        inputmode="numeric"
-        class="w-9 rounded border border-slate-700 bg-slate-800 px-1 py-1 text-center text-sm text-slate-300 outline-none transition focus:border-onbober-primary focus:text-white"
-        :placeholder="`${page + 1}`"
-        title="Go to page"
-        @focus="inputFocused = true"
-        @blur="onInputBlur"
-        @keydown="onInputKeydown"
-      />
-    </div>
-  </div>
-  </div>
   </div>
 </template>
 
@@ -169,18 +151,35 @@ function onInputBlur(): void {
   overflow: hidden;
 }
 
-.symbol-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: #475569 transparent;
+/* Hide scrollbar — arrows + gesture scrolling are the affordance */
+.chip-track {
+  scrollbar-width: none;
 }
-.symbol-scroll::-webkit-scrollbar {
-  height: 5px;
+.chip-track::-webkit-scrollbar {
+  display: none;
 }
-.symbol-scroll::-webkit-scrollbar-thumb {
-  background: #475569;
-  border-radius: 4px;
+
+.scroll-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 0 2px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #94a3b8;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.symbol-scroll::-webkit-scrollbar-track {
-  background: transparent;
+.scroll-arrow svg {
+  width: 13px;
+  height: 13px;
+}
+.scroll-arrow:hover {
+  background: #334155;
+  border-color: #475569;
+  color: #f1f5f9;
 }
 </style>

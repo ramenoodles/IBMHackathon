@@ -2,7 +2,7 @@
 /**
  * Clean graph-first workspace: explorer + timeline + on-demand source modal.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Sidebar from '@/components/workspace/Sidebar.vue'
 import SymbolBar from '@/components/workspace/SymbolBar.vue'
@@ -69,18 +69,10 @@ const {
 
 const {
   symbols,
-  currentPageSymbols,
-  currentPage: symbolBarPage,
-  totalPages: symbolBarTotalPages,
-  hasNextPage: symbolBarHasNext,
-  hasPrevPage: symbolBarHasPrev,
   loading: symbolsLoading,
   error: symbolsError,
   load: loadSymbols,
   reset: resetSymbols,
-  advancePage: symbolBarAdvancePage,
-  prevPage: symbolBarPrevPage,
-  goToPage: symbolBarGoToPage,
 } = useSymbolBrief()
 const { warming, progress } = useFileFlowWarm(graphCache)
 const { detail, loading: detailLoading, streaming: detailStreaming, error: detailError, loadDetail, clear: clearDetail } = useNodeDetail()
@@ -102,7 +94,7 @@ const showSymbolBar = computed(
   () => !!(selectedPath.value && workspacePhase.value === 'tracing'),
 )
 
-const symbolBarNames = computed(() => currentPageSymbols.value.map((s) => s.name))
+const allSymbolNames = computed(() => symbols.value.map((s) => s.name))
 
 function graphPayload() {
   return {
@@ -122,7 +114,7 @@ async function onSelectFile(path: string): Promise<void> {
   resetGraph()
   workspacePhase.value = 'tracing'
   await loadSymbols(userContext.value.workspaceId, path)
-  const first = currentPageSymbols.value[0]
+  const first = symbols.value[0]
   if (first) void onPickSymbol(first.name)
 }
 
@@ -145,6 +137,13 @@ function onSelectNode(node: FlowNode): void {
   selectedNodeId.value = node.id
   prefetchAroundNode(node.id)
 }
+
+// Auto-select the root node whenever a new graph loads
+watch(rootId, (id) => {
+  if (!id) return
+  const root = nodes.value.find((n) => n.id === id)
+  if (root) onSelectNode(root)
+})
 
 function onRequestDetail(node: FlowNode): void {
   void loadDetail(
@@ -248,16 +247,9 @@ function fileName(): string {
           :workspace-id="userContext.workspaceId"
           :file-path="selectedPath"
           :active-symbol="symbol"
-          :symbol-names="symbolBarNames"
-          :has-next-page="symbolBarHasNext"
-          :has-prev-page="symbolBarHasPrev"
-          :current-page="symbolBarPage"
-          :total-pages="symbolBarTotalPages"
+          :all-symbols="allSymbolNames"
           :visible="showSymbolBar"
           @pick="onPickSymbol"
-          @next-page="symbolBarAdvancePage"
-          @prev-page="symbolBarPrevPage"
-          @go-to-page="symbolBarGoToPage"
         />
 
         <Transition name="fade" mode="out-in">
