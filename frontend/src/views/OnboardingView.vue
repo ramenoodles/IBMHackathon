@@ -24,6 +24,11 @@ import {
   ZIP_SETUP_PHRASES,
 } from '@/constants/workspaceSetupPhrases'
 import { DEMO_REPO_LABEL, DEMO_REPO_URL, formatRepoDisplayLabel } from '@/constants/demoRepo'
+import {
+  BEAVER_LOADER_DURATION_MS,
+  BEAVER_LOADER_HOLD_MS,
+  delay,
+} from '@/constants/beaverLoader'
 
 const router = useRouter()
 const { loading, error, setupLocal, setupGitHub, setupDemo, setupZip } = useWorkspaceSetup()
@@ -142,6 +147,11 @@ const useBeaverLoader = computed(
   () => sourceTab.value === 'demo' || sourceTab.value === 'github' || sourceTab.value === 'zip',
 )
 
+/** Keeps the beaver loader visible until the animation finishes, even if the API returns early. */
+const setupAnimating = ref(false)
+
+const showBeaverSetup = computed(() => loading.value || setupAnimating.value)
+
 const canProceed = computed(() => {
   if (step.value === 1) return selectedLangLabels.value.size > 0
   if (step.value === 2) return Boolean(selectedLevel.value)
@@ -167,6 +177,9 @@ async function nextStep(): Promise<void> {
   } else if (step.value === 2) {
     updateUserContext({ experienceLevel: selectedLevel.value })
   } else if (step.value === 3) {
+    const withBeaver = useBeaverLoader.value
+    if (withBeaver) setupAnimating.value = true
+    const startedAt = performance.now()
     try {
       let workspace: { id: string; name: string } | undefined
       if (sourceTab.value === 'demo') {
@@ -179,11 +192,20 @@ async function nextStep(): Promise<void> {
         workspace = await setupZip(zipFile.value)
       }
       if (!workspace) return
+
+      if (withBeaver) {
+        const elapsed = performance.now() - startedAt
+        const remaining = BEAVER_LOADER_DURATION_MS + BEAVER_LOADER_HOLD_MS - elapsed
+        if (remaining > 0) await delay(remaining)
+      }
+
       updateUserContext({ workspaceId: workspace.id, workspaceName: workspace.name })
       router.push('/workspace')
       return
     } catch {
       return
+    } finally {
+      setupAnimating.value = false
     }
   }
   step.value += 1
@@ -196,7 +218,7 @@ function prevStep(): void {
 
 /** Submit step 3 from a text input when Enter is pressed. */
 function onSourceKeydown(event: KeyboardEvent): void {
-  if (event.key !== 'Enter' || step.value !== totalSteps || !canProceed.value || loading.value) return
+  if (event.key !== 'Enter' || step.value !== totalSteps || !canProceed.value || loading.value || setupAnimating.value) return
   event.preventDefault()
   void nextStep()
 }
@@ -204,8 +226,11 @@ function onSourceKeydown(event: KeyboardEvent): void {
 
 <template>
   <div class="flex min-h-screen items-center justify-center bg-slate-950 px-6">
-    <div class="w-full max-w-lg rounded-xl border border-slate-800 bg-slate-900 p-8">
-      <div class="mb-6 flex justify-center">
+    <div
+      class="w-full rounded-xl border border-slate-800 bg-slate-900 p-8"
+      :class="showBeaverSetup && step === totalSteps && useBeaverLoader ? 'max-w-2xl' : 'max-w-lg'"
+    >
+      <div v-if="!(showBeaverSetup && step === totalSteps && useBeaverLoader)" class="mb-6 flex justify-center">
         <img
           :src="logo"
           alt="OnBober mascot"
@@ -213,7 +238,9 @@ function onSourceKeydown(event: KeyboardEvent): void {
           :class="loading ? 'animate-pulse' : ''"
         />
       </div>
-      <p class="mb-2 text-sm text-onbober-primary">Step {{ step }} of {{ totalSteps }}</p>
+      <p v-if="!(showBeaverSetup && step === totalSteps && useBeaverLoader)" class="mb-2 text-sm text-onbober-primary">
+        Step {{ step }} of {{ totalSteps }}
+      </p>
 
       <div v-if="step === 1">
         <h2 class="mb-2 text-2xl font-bold text-white">What are your programming languages?</h2>
@@ -284,31 +311,29 @@ function onSourceKeydown(event: KeyboardEvent): void {
       </div>
 
       <div v-else>
-        <template v-if="loading">
-          <div v-if="useBeaverLoader" class="rounded-lg border border-slate-800 bg-slate-950 px-2 py-4 pb-10">
-            <BeaverRepoLoader
-              :active="loading"
-              :phrases="setupPhrases"
-              :source-label="setupSourceLabel"
-            />
-          </div>
-          <template v-else>
-            <h2 class="mb-2 text-2xl font-bold text-white">Setting up your workspace</h2>
-            <p class="mb-6 text-slate-400">This may take a moment for larger archives.</p>
-            <div class="rounded-lg border border-slate-800 bg-slate-950 px-6 py-8">
-              <p v-if="setupSourceLabel" class="mb-4 truncate text-center font-mono text-sm text-slate-400">
-                {{ setupSourceLabel }}
-              </p>
-              <div class="flex justify-center">
-                <LoadingStatus
-                  :active="true"
-                  :phrases="setupPhrases"
-                  :show-shimmer="false"
-                  phrase-class="text-sm text-slate-400"
-                />
-              </div>
+        <template v-if="showBeaverSetup && useBeaverLoader">
+          <BeaverRepoLoader
+            :active="showBeaverSetup"
+            :phrases="setupPhrases"
+            :source-label="setupSourceLabel"
+          />
+        </template>
+        <template v-else-if="loading">
+          <h2 class="mb-2 text-2xl font-bold text-white">Setting up your workspace</h2>
+          <p class="mb-6 text-slate-400">This may take a moment for larger archives.</p>
+          <div class="rounded-lg border border-slate-800 bg-slate-950 px-6 py-8">
+            <p v-if="setupSourceLabel" class="mb-4 truncate text-center font-mono text-sm text-slate-400">
+              {{ setupSourceLabel }}
+            </p>
+            <div class="flex justify-center">
+              <LoadingStatus
+                :active="true"
+                :phrases="setupPhrases"
+                :show-shimmer="false"
+                phrase-class="text-sm text-slate-400"
+              />
             </div>
-          </template>
+          </div>
         </template>
 
         <template v-else>
@@ -384,10 +409,10 @@ function onSourceKeydown(event: KeyboardEvent): void {
       </div>
 
       <div class="mt-8 flex justify-between">
-        <Button v-if="step > 1" variant="ghost" :disabled="loading" @click="prevStep">Back</Button>
+        <Button v-if="step > 1" variant="ghost" :disabled="loading || setupAnimating" @click="prevStep">Back</Button>
         <div v-else />
-        <Button variant="primary" :disabled="!canProceed || loading" @click="nextStep">
-          {{ step === totalSteps ? (loading ? 'Setting up...' : 'Enter Workspace') : 'Continue' }}
+        <Button variant="primary" :disabled="!canProceed || loading || setupAnimating" @click="nextStep">
+          {{ step === totalSteps ? (loading || setupAnimating ? 'Setting up...' : 'Enter Workspace') : 'Continue' }}
         </Button>
       </div>
     </div>

@@ -5,6 +5,7 @@
 import { computed, onMounted, onUnmounted, ref, toRef, watch } from 'vue'
 import logo from '@/assets/logo.png'
 import { useRotatingPhrase } from '@/composables/useRotatingPhrase'
+import { BEAVER_LOADER_DURATION_MS } from '@/constants/beaverLoader'
 
 const props = withDefaults(
   defineProps<{
@@ -77,7 +78,7 @@ const shavings: Shaving[] = []
 let mainLoopId: number | null = null
 let lastTime = performance.now()
 let spawnCounter = 0
-let finishing = false
+let animStartTime: number | null = null
 
 const displayPercent = computed(() => `${Math.floor(progress.value)}%`)
 
@@ -160,16 +161,13 @@ function update(now: number): void {
   const dt = Math.min((now - lastTime) / 1000, 0.1)
   lastTime = now
 
-  if (props.active && !finishing) {
-    const target = 90
-    const speed = 8 + Math.sin(progress.value * 0.08) * 2
-    if (progress.value < target) {
-      progress.value += speed * dt
-      if (progress.value > target) progress.value = target
-    }
-  } else if (finishing || !props.active) {
-    progress.value += 40 * dt
-    if (progress.value > 100) progress.value = 100
+  if (props.active && animStartTime === null) {
+    animStartTime = now
+  }
+
+  if (animStartTime !== null && (props.active || progress.value < 100)) {
+    const elapsed = now - animStartTime
+    progress.value = Math.min(100, (elapsed / BEAVER_LOADER_DURATION_MS) * 100)
   }
 
   const cutX = START_X + (progress.value / 100) * TOTAL_TRAVEL
@@ -262,11 +260,8 @@ function stopLoop(): void {
 watch(
   () => props.active,
   (isActive) => {
-    if (!isActive && progress.value < 100) {
-      finishing = true
-    }
     if (isActive) {
-      finishing = false
+      animStartTime = performance.now()
       progress.value = 0
       resetShavings()
       chipPool.forEach((chip) => {
@@ -291,26 +286,17 @@ onUnmounted(() => {
 
 <template>
   <div class="beaver-loader">
-    <div class="ui-layer">
-      <div class="header-box">
-        <div class="status-badge">
-          <span class="status-dot" :class="{ complete: isComplete }" />
-          <span>{{ badgeLabel }}</span>
-        </div>
-        <h2 class="title-text">Setting up your workspace</h2>
-        <p v-if="sourceLabel" class="source-label">{{ sourceLabel }}</p>
+    <header class="loader-header">
+      <div class="status-badge">
+        <span class="status-dot" :class="{ complete: isComplete }" />
+        <span>{{ badgeLabel }}</span>
       </div>
+      <h2 class="title-text">Setting up your workspace</h2>
+      <p v-if="sourceLabel" class="source-label">{{ sourceLabel }}</p>
+    </header>
 
-      <div class="footer-panel">
-        <div class="activity-info">
-          <span class="activity-label">Current Progress</span>
-          <span class="activity-text">{{ actionText }}</span>
-        </div>
-        <div class="percent-display" :class="{ complete: isComplete }">{{ displayPercent }}</div>
-      </div>
-    </div>
-
-    <svg class="main-svg" viewBox="0 0 1200 700" xmlns="http://www.w3.org/2000/svg">
+    <div class="animation-stage">
+      <svg class="main-svg" viewBox="0 0 1200 700" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient :id="`${uid}-barkGrad`" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#734120" />
@@ -424,7 +410,16 @@ onUnmounted(() => {
           <text x="0" y="18" font-size="11" font-weight="800" fill="#10b981" text-anchor="middle" font-family="ui-monospace, monospace">100%</text>
         </g>
       </g>
-    </svg>
+      </svg>
+    </div>
+
+    <footer class="footer-panel">
+      <div class="activity-info">
+        <span class="activity-label">Current Progress</span>
+        <span class="activity-text">{{ actionText }}</span>
+      </div>
+      <div class="percent-display" :class="{ complete: isComplete }">{{ displayPercent }}</div>
+    </footer>
 
     <Transition name="phrase-fade" mode="out-in">
       <p :key="currentPhrase" class="rotating-phrase">{{ currentPhrase }}</p>
@@ -434,52 +429,41 @@ onUnmounted(() => {
 
 <style scoped>
 .beaver-loader {
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
   width: 100%;
-  max-width: 400px;
-  margin: 0 auto;
-  aspect-ratio: 12 / 7;
-  background: radial-gradient(circle at 50% 45%, #1e293b 0%, #0f172a 100%);
-  border-radius: 12px;
-  overflow: hidden;
+}
+
+.loader-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.animation-stage {
+  width: 100%;
+  aspect-ratio: 12 / 5;
+  min-height: 180px;
 }
 
 .main-svg {
   width: 100%;
   height: 100%;
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.ui-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px 10px;
-  z-index: 10;
-}
-
-.header-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  display: block;
 }
 
 .status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
+  gap: 8px;
+  padding: 5px 14px;
   background: rgba(15, 23, 42, 0.85);
   border: 1px solid #334155;
   border-radius: 9999px;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -487,17 +471,17 @@ onUnmounted(() => {
 }
 
 .status-dot {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background-color: #f59e0b;
-  box-shadow: 0 0 6px #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
   animation: pulseDot 1.4s infinite ease-in-out;
 }
 
 .status-dot.complete {
   background-color: #10b981;
-  box-shadow: 0 0 8px #10b981;
+  box-shadow: 0 0 10px #10b981;
 }
 
 @keyframes pulseDot {
@@ -506,9 +490,9 @@ onUnmounted(() => {
 }
 
 .title-text {
-  font-size: 14px;
-  font-weight: 700;
-  color: #f1f5f9;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #f8fafc;
   letter-spacing: -0.02em;
 }
 
@@ -517,8 +501,8 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: ui-monospace, monospace;
-  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875rem;
   color: #64748b;
 }
 
@@ -527,22 +511,23 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
   background: rgba(15, 23, 42, 0.9);
   backdrop-filter: blur(8px);
   border: 1px solid #334155;
-  padding: 8px 14px;
-  border-radius: 10px;
+  padding: 14px 20px;
+  border-radius: 14px;
 }
 
 .activity-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
 .activity-label {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -550,19 +535,19 @@ onUnmounted(() => {
 }
 
 .activity-text {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
-  color: #cbd5e1;
-  font-family: ui-monospace, monospace;
+  color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .percent-display {
-  font-size: 20px;
+  font-size: 1.875rem;
   font-weight: 900;
-  font-family: ui-monospace, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   color: #f59e0b;
   letter-spacing: -0.03em;
   flex-shrink: 0;
@@ -573,12 +558,8 @@ onUnmounted(() => {
 }
 
 .rotating-phrase {
-  position: absolute;
-  bottom: -28px;
-  left: 0;
-  right: 0;
   text-align: center;
-  font-size: 13px;
+  font-size: 0.875rem;
   font-style: italic;
   color: #94a3b8;
 }
