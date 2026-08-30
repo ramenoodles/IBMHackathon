@@ -7,7 +7,8 @@ import { computed, nextTick, ref, watch } from 'vue'
 import MarkdownView from '@/components/workspace/MarkdownView.vue'
 import BeaverFlowLoader from '@/components/ui/BeaverFlowLoader.vue'
 import LoadingStatus from '@/components/ui/LoadingStatus.vue'
-import { graphStructureKey, nodeDisplayTitle, useFlowMermaid } from '@/composables/useFlowMermaid'
+import WorkspaceHelpButton from '@/components/ui/WorkspaceHelpButton.vue'
+import { FLOW_EDGE_LEGEND, graphStructureKey, nodeDisplayTitle, useFlowMermaid } from '@/composables/useFlowMermaid'
 import { useFlowPanZoom } from '@/composables/useFlowPanZoom'
 import { useHorizontalResize } from '@/composables/usePanelResize'
 import { useWorkspaceLayout } from '@/composables/useWorkspaceLayout'
@@ -122,7 +123,7 @@ function onGraphRender(reason: 'structure' | 'label'): void {
 }
 
 function onNodeClick(node: FlowNode): void {
-  if (!props.fullyExpanded && node.collapsed && node.expandable) {
+  if (!props.fullyExpanded && node.collapsed && node.expandable && !isCompactNode(node)) {
     emit('expandNode', node)
     return
   }
@@ -200,6 +201,11 @@ const orderedNodes = computed(() => {
 
 const selectedNode = computed(() => props.nodes.find((n) => n.id === props.selectedNodeId))
 const hasDetailContent = computed(() => Boolean(props.selectedNodeId && selectedNode.value))
+const showDetailNavFooter = computed(() => {
+  const node = selectedNode.value
+  if (!node) return false
+  return Boolean(node.calleeFile || node.file || props.detail?.file)
+})
 const showEnrichedSummary = computed(() => {
   const node = selectedNode.value
   if (!node?.summary?.trim()) return false
@@ -227,8 +233,13 @@ function kindLabel(kind: string): string {
   return labels[kind] ?? kind
 }
 
-function openDeepDive(): void {
+function toggleDeepDive(): void {
   if (!selectedNode.value) return
+  if (deepDiveOpen.value) {
+    deepDiveOpen.value = false
+    evidenceOpen.value = false
+    return
+  }
   deepDiveOpen.value = true
   emit('requestDetail', selectedNode.value)
 }
@@ -236,122 +247,158 @@ function openDeepDive(): void {
 </script>
 
 <template>
-  <div class="flex h-full min-w-0 flex-1">
-    <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
-      <div v-if="isMock" class="shrink-0 bg-amber-900/20 px-4 py-1.5 text-xs text-amber-300">
-        No scan data for this symbol
-      </div>
+  <div class="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+    <div v-if="isMock" class="shrink-0 bg-amber-900/20 px-4 py-1.5 text-xs text-amber-300">
+      No scan data for this symbol
+    </div>
 
-      <div v-if="loading" class="flex flex-1 items-center justify-center px-6">
-        <BeaverFlowLoader
-          mode="indeterminate"
-          :active="loading"
-          class="w-full max-w-2xl"
-        />
-      </div>
+    <div v-if="loading" class="flex flex-1 items-center justify-center px-6">
+      <BeaverFlowLoader
+        mode="indeterminate"
+        :active="loading"
+        class="w-full max-w-2xl"
+      />
+    </div>
 
-      <div v-else-if="!symbol" class="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-        <p class="text-lg font-medium text-slate-300">Pick a function to trace</p>
-        <p class="max-w-sm text-sm text-slate-500">Select a file, then choose a function from the bar above.</p>
-      </div>
+    <div v-else-if="!symbol" class="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+      <p class="text-lg font-medium text-slate-300">Pick a function to trace</p>
+      <p class="max-w-sm text-sm text-slate-500">Select a file, then choose a function from the bar above.</p>
+    </div>
 
-      <div v-else-if="!nodes.length" class="flex flex-1 flex-col items-center justify-center gap-1 text-center text-sm text-slate-500">
-        <span>No flow data for: <span class="font-mono text-onbober-primary">{{ symbol }}</span></span>
-        <span class="text-xs text-slate-600">This is not an error. This function is isolated, it has no calls to or from other functions.</span>
-      </div>
+    <div v-else-if="!nodes.length" class="flex flex-1 flex-col items-center justify-center gap-1 text-center text-sm text-slate-500">
+      <span>No flow data for: <span class="font-mono text-onbober-primary">{{ symbol }}</span></span>
+      <span class="text-xs text-slate-600">This is not an error. This function is isolated, it has no calls to or from other functions.</span>
+    </div>
 
-      <template v-else>
-        <div class="flex shrink-0 items-center justify-between gap-2 border-b border-slate-800 px-4 py-2">
-          <div class="flex min-w-0 items-center gap-2">
-            <span class="shrink-0 text-xs text-slate-600">
-              {{ nodes.length }} step{{ nodes.length !== 1 ? 's' : '' }}
-            </span>
-            <span
-              v-if="enriching"
-              class="shrink-0 text-xs font-medium text-amber-400/90"
+    <div v-else class="flex min-h-0 flex-1">
+      <div
+        class="steps-panel flex shrink-0 flex-col border-r border-slate-800 bg-slate-900/40"
+        :class="tracePanelOpen ? 'steps-panel-open' : 'steps-panel-closed'"
+        :style="tracePanelOpen ? { width: `${traceWidth}px` } : { width: '2.75rem' }"
+      >
+        <template v-if="tracePanelOpen">
+          <div class="flex shrink-0 items-center justify-between gap-2 border-b border-slate-800 px-2 py-1.5">
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="text-xs font-medium text-slate-400">
+                {{ nodes.length }} step{{ nodes.length !== 1 ? 's' : '' }}
+              </span>
+              <span
+                v-if="enriching"
+                class="shrink-0 text-xs font-medium text-amber-400/90"
+              >
+                Labeling steps…
+              </span>
+            </div>
+            <button
+              type="button"
+              class="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-white"
+              aria-label="Hide steps panel"
+              title="Hide steps"
+              @click="toggleTracePanel"
             >
-              Labeling steps…
-            </span>
+              <svg class="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2L4 6l4 4"/></svg>
+            </button>
           </div>
-          <div class="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
-            <div
-              class="hidden items-center gap-2 border-r border-slate-800 pr-2 text-[10px] font-medium uppercase tracking-wide text-slate-500 sm:flex"
-              aria-label="Flow map legend"
-            >
-              <span class="flex items-center gap-1" title="Box title still from static code scan">
-                <span class="h-2.5 w-2.5 rounded-sm border-2 border-green-400 bg-green-950" />
-                Scan
-              </span>
-              <span class="flex items-center gap-1" title="Onboarding label from Watsonx">
-                <span class="h-2.5 w-2.5 rounded-sm border-2 border-dashed border-amber-400 bg-amber-950" />
-                AI
-              </span>
-              <span class="flex items-center gap-1" title="Pattern-based onboarding label">
-                <span class="h-2.5 w-2.5 rounded-sm border-2 border-cyan-400 bg-cyan-950" />
-                Auto
-              </span>
-              <span class="flex items-center gap-1" title="Callee folded into one node — preview or click to expand">
-                <span class="h-2.5 w-2.5 rounded-sm border-2 border-onbober-primary bg-slate-800" />
-                Compact
-              </span>
-            </div>
-            <div class="flex items-center gap-1">
+          <ol class="min-h-0 flex-1 overflow-y-auto p-2.5">
+            <li v-for="(node, i) in orderedNodes" :key="node.id" class="mb-1.5">
               <button
                 type="button"
-                class="rounded px-2.5 py-1 text-xs font-medium transition"
+                class="w-full rounded-md border px-2.5 py-2 text-left transition"
                 :class="
-                  tracePanelOpen
-                    ? 'bg-slate-800 text-slate-300'
-                    : 'text-slate-500 hover:bg-slate-800 hover:text-slate-300'
+                  selectedNodeId === node.id
+                    ? 'border-onbober-primary/50 bg-onbober-primary/5'
+                    : 'border-transparent hover:border-slate-700 hover:bg-slate-800/50'
                 "
-                :aria-pressed="tracePanelOpen"
-                title="Toggle steps panel"
-                @click="toggleTracePanel"
+                @click="onNodeClick(node)"
               >
-                Steps
+                <div class="flex items-center gap-2">
+                  <span
+                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                    :class="
+                      selectedNodeId === node.id
+                        ? 'bg-onbober-primary text-white'
+                        : 'bg-slate-800 text-slate-400'
+                    "
+                  >
+                    {{ i + 1 }}
+                  </span>
+                  <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-100">
+                    {{ nodeDisplayTitle(node) }}
+                  </span>
+                  <span
+                    v-if="labelSourcePill(node.labelSource)"
+                    class="shrink-0 rounded px-1 py-0.5 text-[10px] font-bold uppercase"
+                    :class="
+                      node.labelSource === 'ai'
+                        ? 'bg-amber-900/30 text-amber-400'
+                        : 'bg-cyan-900/30 text-cyan-400'
+                    "
+                  >
+                    {{ labelSourcePill(node.labelSource) }}
+                  </span>
+                  <button
+                    v-if="isCompactNode(node)"
+                    type="button"
+                    class="shrink-0 rounded px-1 py-0.5 text-[10px] font-bold uppercase text-onbober-primary hover:bg-onbober-primary/10"
+                    title="Expand inline"
+                    aria-label="Expand inline"
+                    @click.stop="emit('expandNode', node)"
+                  >
+                    Expand
+                  </button>
+                  <button
+                    v-if="canPreviewCalleeFlow(node)"
+                    type="button"
+                    class="flex shrink-0 items-center gap-1 rounded p-0.5 text-onbober-primary hover:bg-onbober-primary/10"
+                    title="View code flow (scan labels)"
+                    aria-label="View code flow"
+                    @click.stop="emit('previewCompacted', node)"
+                  >
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                      <path d="M8 2L2 5.5v5L8 14l6-3.5v-5L8 2z" />
+                      <path d="M2 5.5L8 9l6-3.5M8 9v5" />
+                    </svg>
+                    <span class="hidden font-semibold sm:inline">View flow</span>
+                  </button>
+                  <span
+                    v-if="hasHiddenChildren(node.id)"
+                    class="shrink-0 rounded bg-onbober-primary/20 px-1.5 py-0.5 text-xs font-bold uppercase text-onbober-primary"
+                  >
+                    +
+                  </span>
+                  <span class="shrink-0 text-xs font-medium uppercase text-slate-500">{{ kindLabel(node.kind) }}</span>
+                </div>
+                <p v-if="node.summary && node.summary !== nodeDisplayTitle(node)" class="mt-1.5 text-sm leading-snug text-slate-400">
+                  {{ node.summary }}
+                </p>
+                <p v-if="node.code" class="mt-1 line-clamp-2 break-all font-mono text-xs leading-relaxed text-slate-400">{{ node.code }}</p>
               </button>
-              <button
-                v-if="hasDetailContent"
-                type="button"
-                class="rounded px-2.5 py-1 text-xs font-medium transition"
-                :class="
-                  detailPanelOpen
-                    ? 'bg-slate-800 text-slate-300'
-                    : 'text-slate-500 hover:bg-slate-800 hover:text-slate-300'
-                "
-                :aria-pressed="detailPanelOpen"
-                title="Toggle details panel"
-                @click="toggleDetailPanel"
-              >
-                Details
-              </button>
-            </div>
-            <div class="flex items-center gap-0.5 rounded-md border border-slate-700 p-0.5">
-              <button
-                type="button"
-                class="rounded px-2 py-0.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
-                title="Zoom out"
-                @click="zoomOut"
-              >
-                −
-              </button>
-              <button
-                type="button"
-                class="rounded px-2 py-0.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
-                title="Centre view"
-                @click="centerView"
-              >
-                Center
-              </button>
-              <button
-                type="button"
-                class="rounded px-2 py-0.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
-                title="Zoom in"
-                @click="zoomIn"
-              >
-                +
-              </button>
-            </div>
+            </li>
+          </ol>
+        </template>
+
+        <div v-else class="flex h-full justify-center pt-2">
+          <button
+            type="button"
+            class="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition hover:bg-slate-800 hover:text-white"
+            aria-label="Show steps panel"
+            title="Show steps"
+            @click="toggleTracePanel"
+          >
+            <svg class="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2l4 4-4 4"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <ResizeHandle
+        v-if="tracePanelOpen && !isMobile"
+        label="Resize steps panel"
+        @pointerdown="onTraceResize"
+      />
+
+      <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-800 px-4 py-2 sm:gap-3">
+            <WorkspaceHelpButton variant="workspace" placement="below" />
             <button
               v-if="!fullyExpanded && !mappingFullFlow"
               type="button"
@@ -360,7 +407,6 @@ function openDeepDive(): void {
             >
               Show full flow
             </button>
-          </div>
         </div>
 
         <p v-if="error" class="shrink-0 px-4 py-2 text-sm text-red-400">{{ error }}</p>
@@ -368,164 +414,97 @@ function openDeepDive(): void {
           {{ enrichError }} — showing verified labels only.
         </p>
 
-        <div class="flex min-h-0 flex-1">
+        <div
+          ref="panViewport"
+          class="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-slate-950/50"
+          title="Drag background to pan, scroll to zoom"
+        >
           <div
-            class="steps-panel flex shrink-0 flex-col border-r border-slate-800 bg-slate-900/40"
-            :class="tracePanelOpen ? 'steps-panel-open' : 'steps-panel-closed'"
-            :style="tracePanelOpen ? { width: `${traceWidth}px` } : { width: '2.75rem' }"
+            v-if="mappingFullFlow"
+            class="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm px-4"
           >
-            <template v-if="tracePanelOpen">
-              <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-2 py-1.5">
-                <span class="text-xs font-semibold uppercase tracking-wide text-slate-400">Steps</span>
-                <button
-                  type="button"
-                  class="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-white"
-                  aria-label="Hide steps panel"
-                  title="Hide steps"
-                  @click="toggleTracePanel"
-                >
-                  <svg class="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2L4 6l4 4"/></svg>
-                </button>
-              </div>
-              <ol class="min-h-0 flex-1 overflow-y-auto p-2.5">
-                <li v-for="(node, i) in orderedNodes" :key="node.id" class="mb-1.5">
-                  <button
-                    type="button"
-                    class="w-full rounded-md border px-2.5 py-2 text-left transition"
-                    :class="
-                      selectedNodeId === node.id
-                        ? 'border-onbober-primary/50 bg-onbober-primary/5'
-                        : 'border-transparent hover:border-slate-700 hover:bg-slate-800/50'
-                    "
-                    @click="onNodeClick(node)"
-                  >
-                    <div class="flex items-center gap-2">
-                      <span
-                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-                        :class="
-                          selectedNodeId === node.id
-                            ? 'bg-onbober-primary text-white'
-                            : 'bg-slate-800 text-slate-400'
-                        "
-                      >
-                        {{ i + 1 }}
-                      </span>
-                      <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-100">
-                        {{ nodeDisplayTitle(node) }}
-                      </span>
-                      <span
-                        v-if="labelSourcePill(node.labelSource)"
-                        class="shrink-0 rounded px-1 py-0.5 text-[10px] font-bold uppercase"
-                        :class="
-                          node.labelSource === 'ai'
-                            ? 'bg-amber-900/30 text-amber-400'
-                            : 'bg-cyan-900/30 text-cyan-400'
-                        "
-                      >
-                        {{ labelSourcePill(node.labelSource) }}
-                      </span>
-                      <button
-                        v-if="isCompactNode(node)"
-                        type="button"
-                        class="shrink-0 rounded px-1 py-0.5 text-[10px] font-bold uppercase text-onbober-primary hover:bg-onbober-primary/10"
-                        title="Expand inline"
-                        aria-label="Expand inline"
-                        @click.stop="emit('expandNode', node)"
-                      >
-                        Expand
-                      </button>
-                      <button
-                        v-if="canPreviewCalleeFlow(node)"
-                        type="button"
-                        class="flex shrink-0 items-center gap-1 rounded p-0.5 text-onbober-primary hover:bg-onbober-primary/10"
-                        title="View code flow (scan labels)"
-                        aria-label="View code flow"
-                        @click.stop="emit('previewCompacted', node)"
-                      >
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                          <path d="M8 2L2 5.5v5L8 14l6-3.5v-5L8 2z" />
-                          <path d="M2 5.5L8 9l6-3.5M8 9v5" />
-                        </svg>
-                        <span class="hidden font-semibold sm:inline">View flow</span>
-                      </button>
-                      <span
-                        v-if="hasHiddenChildren(node.id)"
-                        class="shrink-0 rounded bg-onbober-primary/20 px-1.5 py-0.5 text-xs font-bold uppercase text-onbober-primary"
-                      >
-                        +
-                      </span>
-                      <span class="shrink-0 text-xs font-medium uppercase text-slate-500">{{ kindLabel(node.kind) }}</span>
-                    </div>
-                    <p v-if="node.summary && node.summary !== nodeDisplayTitle(node)" class="mt-1.5 text-sm leading-snug text-slate-400">
-                      {{ node.summary }}
-                    </p>
-                    <p v-if="node.code" class="mt-1 line-clamp-2 break-all font-mono text-xs leading-relaxed text-slate-400">{{ node.code }}</p>
-                  </button>
-                </li>
-              </ol>
-            </template>
-
-            <div v-else class="flex h-full justify-center pt-2">
-              <button
-                type="button"
-                class="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition hover:bg-slate-800 hover:text-white"
-                aria-label="Show steps panel"
-                title="Show steps"
-                @click="toggleTracePanel"
-              >
-                <svg class="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2l4 4-4 4"/></svg>
-              </button>
-            </div>
+            <BeaverFlowLoader
+              mode="progress"
+              :active="mappingFullFlow"
+              :progress="mappingProgress"
+              compact
+              class="w-full max-w-2xl"
+            />
           </div>
-
-          <ResizeHandle
-            v-if="tracePanelOpen && !isMobile"
-            label="Resize steps panel"
-            @pointerdown="onTraceResize"
-          />
-
-          <div
-            ref="panViewport"
-            class="relative min-w-0 flex-1 overflow-hidden bg-slate-950/50"
-            title="Drag background to pan, scroll to zoom"
-          >
+          <div ref="panContent" class="absolute inset-0 p-4">
             <div
-              v-if="mappingFullFlow"
-              class="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm px-4"
-            >
-              <BeaverFlowLoader
-                mode="progress"
-                :active="mappingFullFlow"
-                :progress="mappingProgress"
-                compact
-                class="w-full max-w-2xl"
-              />
-            </div>
-            <div ref="panContent" class="absolute inset-0 p-4">
-              <div
-                ref="mermaidContainer"
-                class="mermaid-flow mx-auto flex min-h-[180px] min-w-fit items-center justify-center"
-              />
-            </div>
-            <p v-if="renderError" class="pointer-events-none absolute bottom-2 left-0 right-0 text-center text-xs text-red-400">
-              {{ renderError }}
-            </p>
+              ref="mermaidContainer"
+              class="mermaid-flow mx-auto flex min-h-[180px] min-w-fit items-center justify-center"
+            />
           </div>
+          <div
+            class="absolute bottom-3 left-3 z-[5] flex items-center gap-1 rounded-md border border-slate-800/80 bg-slate-950/85 p-1 backdrop-blur-sm"
+            aria-label="Graph zoom controls"
+          >
+            <button
+              type="button"
+              class="rounded px-3 py-1.5 text-sm text-slate-400 hover:bg-slate-800 hover:text-white"
+              title="Zoom out"
+              @click="zoomOut"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              class="rounded px-3 py-1.5 text-sm text-slate-400 hover:bg-slate-800 hover:text-white"
+              title="Centre view"
+              @click="centerView"
+            >
+              Center
+            </button>
+            <button
+              type="button"
+              class="rounded px-3 py-1.5 text-sm text-slate-400 hover:bg-slate-800 hover:text-white"
+              title="Zoom in"
+              @click="zoomIn"
+            >
+              +
+            </button>
+          </div>
+          <div
+            class="pointer-events-none absolute bottom-3 right-3 z-[5] flex items-center gap-2.5 rounded-md border border-slate-800/80 bg-slate-950/85 px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 backdrop-blur-sm"
+            aria-label="Flow arrow legend"
+          >
+            <span
+              v-for="item in FLOW_EDGE_LEGEND"
+              :key="item.key"
+              class="flex items-center gap-1.5"
+              :title="item.title"
+            >
+              <svg class="h-3 w-6 shrink-0" viewBox="0 0 20 8" fill="none" aria-hidden="true">
+                <path
+                  d="M0 4h14M11 1l4 3-4 3"
+                  :stroke="item.color"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              {{ item.label }}
+            </span>
+          </div>
+          <p v-if="renderError" class="pointer-events-none absolute bottom-2 left-0 right-0 text-center text-xs text-red-400">
+            {{ renderError }}
+          </p>
         </div>
-      </template>
-    </div>
+      </div>
 
-    <ResizeHandle
-      v-if="hasDetailContent && detailPanelOpen && !isMobile"
-      label="Resize details panel"
-      @pointerdown="onDetailResize"
-    />
+      <ResizeHandle
+        v-if="hasDetailContent && detailPanelOpen && !isMobile"
+        label="Resize details panel"
+        @pointerdown="onDetailResize"
+      />
 
-    <aside
-      class="detail-panel flex shrink-0 flex-col border-l border-slate-800 bg-slate-900"
-      :class="hasDetailContent && detailPanelOpen ? 'detail-panel-open' : 'detail-panel-closed'"
-      :style="hasDetailContent && detailPanelOpen ? { width: `${detailWidth}px` } : { width: '2.75rem' }"
-    >
+      <aside
+        class="detail-panel flex shrink-0 flex-col border-l border-slate-800 bg-slate-900"
+        :class="hasDetailContent && detailPanelOpen ? 'detail-panel-open' : 'detail-panel-closed'"
+        :style="hasDetailContent && detailPanelOpen ? { width: `${detailWidth}px` } : { width: '2.75rem' }"
+      >
       <template v-if="hasDetailContent && detailPanelOpen">
         <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-3 py-2">
           <span class="text-xs font-semibold uppercase tracking-wide text-slate-400">Details</span>
@@ -539,7 +518,8 @@ function openDeepDive(): void {
             <svg class="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2l4 4-4 4"/></svg>
           </button>
         </div>
-        <div v-if="selectedNode" class="min-h-0 flex-1 overflow-y-auto p-4">
+        <template v-if="selectedNode">
+          <div class="min-h-0 flex-1 overflow-y-auto p-4">
           <h3 class="text-lg font-semibold text-white">{{ nodeDisplayTitle(selectedNode) }}</h3>
 
           <section class="mt-3">
@@ -588,15 +568,20 @@ function openDeepDive(): void {
 
           <section class="mt-4">
             <button
-              v-if="!deepDiveOpen"
               type="button"
-              class="w-full rounded-md border border-slate-700 px-3 py-2.5 text-left text-sm text-slate-300 transition hover:border-onbober-primary/50 hover:text-white"
-              @click="openDeepDive"
+              class="w-full rounded-md border px-3 py-2.5 text-left text-sm transition"
+              :class="
+                deepDiveOpen
+                  ? 'border-amber-600/40 bg-amber-900/10 text-amber-300 hover:border-amber-500/50 hover:text-amber-200'
+                  : 'border-slate-700 text-slate-300 hover:border-onbober-primary/50 hover:text-white'
+              "
+              :aria-expanded="deepDiveOpen"
+              @click="toggleDeepDive"
             >
-              Explain this step
+              {{ deepDiveOpen ? 'Hide deep dive' : 'Explain this step' }}
             </button>
-            <template v-else>
-              <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-2 py-0.5 text-xs font-bold uppercase text-amber-400">
+            <template v-if="deepDiveOpen">
+              <span class="mt-3 inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-2 py-0.5 text-xs font-bold uppercase text-amber-400">
                 Deep dive
               </span>
               <LoadingStatus
@@ -666,31 +651,46 @@ function openDeepDive(): void {
               <span class="mt-0.5 block text-xs font-normal text-slate-400">Full callee graph · scan labels only</span>
             </button>
             <button
-              v-if="selectedNode && isCompactNode(selectedNode)"
+              v-if="isCompactNode(selectedNode)"
               type="button"
               class="text-left text-sm text-slate-400 transition hover:text-onbober-primary"
               @click="emit('expandNode', selectedNode)"
             >
               Expand inline
             </button>
+          </div>
+          </div>
+
+          <footer
+            v-if="showDetailNavFooter"
+            class="flex shrink-0 flex-col gap-1.5 border-t border-slate-800 bg-slate-950/60 px-3 py-2.5"
+          >
             <button
               v-if="selectedNode.calleeFile"
               type="button"
-              class="text-left text-sm text-onbober-primary hover:underline"
+              class="w-full rounded-md border border-slate-700 bg-slate-900/50 px-2.5 py-2 text-left text-xs transition hover:border-slate-500 hover:bg-slate-800"
               @click="emit('goToDefinition', selectedNode.calleeFile!, selectedNode.calleeSymbol ?? selectedNode.label, selectedNode.calleeLine ?? 1)"
             >
-              Go to {{ selectedNode.calleeSymbol }} ({{ selectedNode.calleeFile }}:{{ selectedNode.calleeLine }})
+              <span class="block font-medium text-onbober-primary">
+                Go to {{ selectedNode.calleeSymbol }}
+              </span>
+              <span class="mt-0.5 block truncate font-mono text-[10px] text-slate-500">
+                {{ selectedNode.calleeFile }}:{{ selectedNode.calleeLine }}
+              </span>
             </button>
             <button
               v-if="selectedNode.file || detail?.file"
               type="button"
-              class="text-left text-sm text-slate-400 hover:text-onbober-primary hover:underline"
+              class="w-full rounded-md border border-slate-700 bg-slate-900/50 px-2.5 py-2 text-left text-xs transition hover:border-slate-500 hover:bg-slate-800"
               @click="emit('viewSource', selectedNode.file ?? detail?.file, selectedNode.line ?? undefined)"
             >
-              View source{{ selectedNode.line ? ` (line ${selectedNode.line})` : '' }}
+              <span class="block font-medium text-slate-300">View source</span>
+              <span v-if="selectedNode.line" class="mt-0.5 block text-[10px] text-slate-500">
+                line {{ selectedNode.line }}
+              </span>
             </button>
-          </div>
-        </div>
+          </footer>
+        </template>
       </template>
 
       <div v-else class="flex h-full justify-center pt-2">
@@ -705,6 +705,7 @@ function openDeepDive(): void {
         </button>
       </div>
     </aside>
+    </div>
   </div>
 </template>
 
@@ -752,9 +753,12 @@ function openDeepDive(): void {
 
 .mermaid-flow :deep(g.node.is-selected rect),
 .mermaid-flow :deep(g.node.is-selected polygon),
-.mermaid-flow :deep(g.node.is-selected path) {
+.mermaid-flow :deep(g.node.is-selected path),
+.mermaid-flow :deep(g.node.is-selected circle),
+.mermaid-flow :deep(g.node.is-selected ellipse) {
   stroke: #ff3366 !important;
-  stroke-width: 3px !important;
+  stroke-width: 4px !important;
+  filter: drop-shadow(0 0 6px rgba(255, 51, 102, 0.9)) drop-shadow(0 0 14px rgba(255, 51, 102, 0.45));
 }
 
 .mermaid-flow :deep(g.node.is-selected .label),

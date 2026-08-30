@@ -100,16 +100,48 @@ export function graphLabelKey(nodes: FlowNode[]): string {
     .join('|')
 }
 
-const EDGE_COLORS = {
+const FLOW_EDGE_COLORS = {
   true: '#4ade80',
   false: '#f87171',
   default: '#60a5fa',
 } as const
 
+export { FLOW_EDGE_COLORS }
+
+export type FlowEdgeLegendKey = keyof typeof FLOW_EDGE_COLORS
+
+export interface FlowEdgeLegendItem {
+  key: FlowEdgeLegendKey
+  color: string
+  label: string
+  title: string
+}
+
+export const FLOW_EDGE_LEGEND: FlowEdgeLegendItem[] = [
+  {
+    key: 'true',
+    color: FLOW_EDGE_COLORS.true,
+    label: 'True',
+    title: 'Branch taken when condition is true',
+  },
+  {
+    key: 'false',
+    color: FLOW_EDGE_COLORS.false,
+    label: 'False',
+    title: 'Branch taken when condition is false',
+  },
+  {
+    key: 'default',
+    color: FLOW_EDGE_COLORS.default,
+    label: 'Flow',
+    title: 'Sequential steps, loops, entry (start, then, done, etc.)',
+  },
+]
+
 function edgeColor(label?: string): string {
-  if (label === 'true') return EDGE_COLORS.true
-  if (label === 'false') return EDGE_COLORS.false
-  return EDGE_COLORS.default
+  if (label === 'true') return FLOW_EDGE_COLORS.true
+  if (label === 'false') return FLOW_EDGE_COLORS.false
+  return FLOW_EDGE_COLORS.default
 }
 
 export function compileToMermaid(
@@ -214,7 +246,7 @@ export function styleEdgeLabels(container: HTMLElement | null): void {
     if (!labelText) continue
 
     const flowType = labelText === 'true' ? 'true' : labelText === 'false' ? 'false' : 'default'
-    const color = EDGE_COLORS[flowType]
+    const color = FLOW_EDGE_COLORS[flowType]
 
     // Mermaid sizes the label box without our pill padding; allow the pill
     // to extend past the invisible container so its rounded edge isn't clipped.

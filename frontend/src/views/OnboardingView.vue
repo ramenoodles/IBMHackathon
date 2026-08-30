@@ -10,6 +10,7 @@ import LoadingStatus from '@/components/ui/LoadingStatus.vue'
 import logo from '@/assets/logo.png'
 import {
   type ExperienceLevel,
+  hasFamiliarLanguages,
   updateUserContext,
   userContext,
 } from '@/store/userContext'
@@ -129,7 +130,11 @@ function onZipChange(event: Event): void {
 /** Advance to the next onboarding step or finish and enter the workspace. */
 async function nextStep(): Promise<void> {
   if (step.value === 1) {
-    updateUserContext({ primaryLanguage: selectedLanguagesValue.value || 'auto' })
+    const primaryLanguage = selectedLanguagesValue.value || 'auto'
+    updateUserContext({
+      primaryLanguage,
+      languageComparisons: hasFamiliarLanguages(primaryLanguage),
+    })
   } else if (step.value === 2) {
     updateUserContext({ experienceLevel: selectedLevel.value })
   } else if (step.value === 3) {

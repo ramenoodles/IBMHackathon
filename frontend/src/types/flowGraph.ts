@@ -102,5 +102,8 @@ export interface GraphExpandPayload {
   nodeId: string
   parentPath: string[]
   expandLimit: number
+  /** When set, backend expands this callee directly without rebuilding the caller CFG. */
+  calleeFile?: string
+  calleeSymbol?: string
   userContext: GraphRootPayload['userContext']
 }

@@ -7,16 +7,19 @@ import { useRouter } from 'vue-router'
 import ExperienceLevelToggle from '@/components/workspace/ExperienceLevelToggle.vue'
 import LanguageComparisonsToggle from '@/components/workspace/LanguageComparisonsToggle.vue'
 import FamiliarLanguagesMenu from '@/components/workspace/FamiliarLanguagesMenu.vue'
+import WorkspaceBobbers from '@/components/workspace/WorkspaceBobbers.vue'
+import WorkspaceBobbersToggle from '@/components/workspace/WorkspaceBobbersToggle.vue'
 import Sidebar from '@/components/workspace/Sidebar.vue'
 import SymbolBar from '@/components/workspace/SymbolBar.vue'
 import FlowCanvas from '@/components/workspace/FlowCanvas.vue'
 import FlowWarmOverlay from '@/components/workspace/FlowWarmOverlay.vue'
-import BranchPrompt from '@/components/workspace/BranchPrompt.vue'
 import CompactFlowPreview from '@/components/workspace/CompactFlowPreview.vue'
 import Modal from '@/components/ui/Modal.vue'
 import CodePanel from '@/components/workspace/CodePanel.vue'
 import ResizeHandle from '@/components/ui/ResizeHandle.vue'
+import TeamCreditsBar from '@/components/ui/TeamCreditsBar.vue'
 import { useWorkspaceLayout } from '@/composables/useWorkspaceLayout'
+import { useWorkspaceBobbers } from '@/composables/useWorkspaceBobbers'
 import { useHorizontalResize } from '@/composables/usePanelResize'
 import { useFlowGraphCache } from '@/composables/useFlowGraphCache'
 import { useFlowGraph } from '@/composables/useFlowGraph'
@@ -47,6 +50,13 @@ const { onPointerDown: onExplorerResize } = useHorizontalResize({
   side: 'right',
   enabled: resizeEnabled,
   onEnd: persistWidths,
+})
+
+const { showBobbers, setShowBobbers } = useWorkspaceBobbers()
+
+const showLittleBobers = computed({
+  get: () => showBobbers.value,
+  set: (value: boolean) => setShowBobbers(value),
 })
 
 const graphCache = useFlowGraphCache()
@@ -91,8 +101,6 @@ const selectedNodeId = ref('')
 const sourceOpen = ref(false)
 const sourcePath = ref('')
 const sourceLine = ref<number | undefined>(undefined)
-const branchPromptOpen = ref(false)
-const branchNode = ref<FlowNode | null>(null)
 const compactPreviewOpen = ref(false)
 const compactPreviewNode = ref<FlowNode | null>(null)
 
@@ -249,18 +257,7 @@ await onPickSymbol(nextSymbol.name)
 }
 
 function onExpandNode(node: FlowNode): void {
-  if (node.childCount > 3) {
-    branchNode.value = node
-    branchPromptOpen.value = true
-  } else {
-    void expandNode(node.id, graphPayload(), node.childCount ? node.childCount + 1 : 3)
-  }
-}
-
-function onConfirmExpand(limit: number): void {
-  if (!branchNode.value) return
-  void expandNode(branchNode.value.id, graphPayload(), limit)
-  branchNode.value = null
+  void expandNode(node, graphPayload())
 }
 
 function onShowFullFlow(): void {
@@ -286,12 +283,13 @@ function fileName(): string {
         title="Go home"
         @click="leaveConfirmOpen = true"
       >
-        <img src="@/assets/dark_headline.png" alt="OnBober" class="h-6 w-auto" />
+        <img src="@/assets/dark_headline.png" alt="OnBober" class="h-8 w-auto sm:h-9" />
       </button>
-      <span v-if="selectedPath" class="truncate text-xs text-slate-500">
+      <span v-if="selectedPath" class="truncate text-sm text-slate-400 sm:text-base">
         {{ fileName() }}
       </span>
       <div class="ml-auto flex items-center gap-2">
+        <WorkspaceBobbersToggle v-model="showLittleBobers" />
         <FamiliarLanguagesMenu
           :primary-language="userContext.primaryLanguage"
           @change="onFamiliarLanguagesChange"
@@ -312,12 +310,14 @@ function fileName(): string {
       </div>
     </header>
 
-    <div class="flex min-h-0 flex-1">
+    <div class="relative flex min-h-0 flex-1">
+      <WorkspaceBobbers v-if="showLittleBobers" />
       <Sidebar
         :workspace-id="userContext.workspaceId"
         :selected-path="selectedPath"
         :open="sidebarOpen"
         :width="explorerWidth"
+        :show-bobbers="showLittleBobers"
         @select="onSelectFile"
         @toggle="toggleSidebar"
       />
@@ -327,7 +327,7 @@ function fileName(): string {
         @pointerdown="onExplorerResize"
       />
 
-      <div class="relative flex min-w-0 flex-1 flex-col">
+      <div class="relative z-10 flex min-w-0 flex-1 flex-col">
         <SymbolBar
           :workspace-id="userContext.workspaceId"
           :file-path="selectedPath"
@@ -337,10 +337,12 @@ function fileName(): string {
           @pick="onPickSymbol"
         />
 
-        <Transition name="fade" mode="out-in">
-          <FlowCanvas
-            v-if="workspacePhase === 'tracing'"
-            key="tracing"
+        <div class="flex min-h-0 flex-1 flex-col">
+          <Transition name="fade" mode="out-in">
+            <FlowCanvas
+              v-if="workspacePhase === 'tracing'"
+              key="tracing"
+              class="min-h-0 flex-1"
             :nodes="nodes"
             :edges="edges"
             :root-id="rootId"
@@ -373,14 +375,24 @@ function fileName(): string {
           <div
             v-else
             key="idle"
-            class="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-slate-500"
+            class="relative flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-slate-500"
           >
+            <img
+              v-if="showLittleBobers"
+              src="@/assets/logo.png"
+              alt=""
+              class="idle-bobber pointer-events-none absolute bottom-8 right-12 h-12 w-auto opacity-[0.06]"
+              aria-hidden="true"
+            />
             <p class="text-lg font-medium text-slate-300">Select a file to begin</p>
             <p class="max-w-sm text-sm">Choose a file from the explorer to see traceable symbols.</p>
           </div>
         </Transition>
+        </div>
       </div>
     </div>
+
+    <TeamCreditsBar />
 
     <Modal :open="leaveConfirmOpen" title="Leave workspace?" @close="leaveConfirmOpen = false">
       <p class="mb-5 text-sm text-slate-300">Are you sure you would like to leave the workspace?</p>
@@ -411,14 +423,6 @@ function fileName(): string {
       />
     </Modal>
 
-    <BranchPrompt
-      :open="branchPromptOpen"
-      :node-label="branchNode?.label ?? ''"
-      :child-count="branchNode?.childCount ?? 0"
-      @close="branchPromptOpen = false"
-      @expand="onConfirmExpand"
-    />
-
     <CompactFlowPreview
       :open="compactPreviewOpen"
       :workspace-id="userContext.workspaceId"
@@ -441,5 +445,14 @@ function fileName(): string {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.idle-bobber {
+  animation: idle-bobber-bob 4s ease-in-out infinite;
+}
+
+@keyframes idle-bobber-bob {
+  0%, 100% { transform: translateY(0) rotate(-8deg); }
+  50% { transform: translateY(-6px) rotate(-4deg); }
 }
 </style>
