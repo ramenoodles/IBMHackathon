@@ -121,6 +121,10 @@ function onGraphRender(reason: 'structure' | 'label'): void {
 }
 
 function onNodeClick(node: FlowNode): void {
+  if (!props.fullyExpanded && node.collapsed && node.expandable) {
+    emit('expandNode', node)
+    return
+  }
   if (props.hasHiddenChildren(node.id)) {
     emit('revealNode', node)
   }
@@ -196,12 +200,6 @@ const orderedNodes = computed(() => {
 
 const selectedNode = computed(() => props.nodes.find((n) => n.id === props.selectedNodeId))
 const hasDetailContent = computed(() => Boolean(props.selectedNodeId && selectedNode.value))
-
-watch(selectedNode, (node) => {
-  if (node && isCompactNode(node) && !detailPanelOpen.value) {
-    detailPanelOpen.value = true
-  }
-})
 const showEnrichedSummary = computed(() => {
   const node = selectedNode.value
   if (!node?.summary?.trim()) return false
@@ -292,7 +290,7 @@ function openDeepDive(): void {
                 <span class="h-2.5 w-2.5 rounded-sm border-2 border-cyan-400 bg-cyan-950" />
                 Auto
               </span>
-              <span class="flex items-center gap-1" title="Callee folded into one node — select step, then View code flow in Details">
+              <span class="flex items-center gap-1" title="Callee folded into one node — preview or click to expand">
                 <span class="h-2.5 w-2.5 rounded-sm border-2 border-onbober-primary bg-slate-800" />
                 Compact
               </span>
@@ -429,26 +427,15 @@ function openDeepDive(): void {
                       <button
                         v-if="isCompactNode(node)"
                         type="button"
-                        class="shrink-0 rounded px-1 py-0.5 text-[10px] font-bold uppercase text-onbober-primary hover:bg-onbober-primary/10"
-                        title="Expand inline"
-                        aria-label="Expand inline"
-                        @click.stop="emit('expandNode', node)"
-                      >
-                        Expand
-                      </button>
-                      <button
-                        v-if="isCompactNode(node)"
-                        type="button"
-                        class="flex shrink-0 items-center gap-1 rounded p-0.5 text-onbober-primary hover:bg-onbober-primary/10"
-                        title="View code flow (scan labels)"
-                        aria-label="View code flow"
+                        class="shrink-0 rounded p-0.5 text-onbober-primary hover:bg-onbober-primary/10"
+                        title="Preview compacted flow"
+                        aria-label="Preview compacted flow"
                         @click.stop="emit('previewCompacted', node)"
                       >
                         <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                           <path d="M8 2L2 5.5v5L8 14l6-3.5v-5L8 2z" />
                           <path d="M2 5.5L8 9l6-3.5M8 9v5" />
                         </svg>
-                        <span class="hidden font-semibold sm:inline">View flow</span>
                       </button>
                       <span
                         v-if="hasHiddenChildren(node.id)"
@@ -556,12 +543,6 @@ function openDeepDive(): void {
               class="mt-2 overflow-x-auto rounded border border-slate-800 bg-slate-950 p-3 font-mono text-sm leading-relaxed text-slate-200"
             >{{ selectedNode.code }}</pre>
             <p v-else class="mt-2 text-sm text-slate-500">No source snippet for this step.</p>
-            <p
-              v-if="isCompactNode(selectedNode)"
-              class="mt-3 text-sm leading-relaxed text-slate-400"
-            >
-              This step is folded. Use <strong class="font-medium text-slate-300">View code flow</strong> to see the full callee graph with scan labels, or <strong class="font-medium text-slate-300">Expand inline</strong> to unfold it in the main diagram.
-            </p>
           </section>
 
           <section v-if="showEnrichedSummary && enrichedBadge" class="mt-4">
@@ -654,23 +635,6 @@ function openDeepDive(): void {
 
           <div class="mt-4 flex flex-col gap-2">
             <button
-              v-if="selectedNode && isCompactNode(selectedNode)"
-              type="button"
-              class="w-full rounded-md border border-onbober-primary/40 bg-onbober-primary/5 px-3 py-2.5 text-left text-sm font-medium text-onbober-primary transition hover:border-onbober-primary/60 hover:bg-onbober-primary/10"
-              @click="emit('previewCompacted', selectedNode)"
-            >
-              View code flow
-              <span class="mt-0.5 block text-xs font-normal text-slate-400">Full callee graph · scan labels only</span>
-            </button>
-            <button
-              v-if="selectedNode && isCompactNode(selectedNode)"
-              type="button"
-              class="text-left text-sm text-slate-400 transition hover:text-onbober-primary"
-              @click="emit('expandNode', selectedNode)"
-            >
-              Expand inline
-            </button>
-            <button
               v-if="selectedNode.calleeFile"
               type="button"
               class="text-left text-sm text-onbober-primary hover:underline"
@@ -743,11 +707,8 @@ function openDeepDive(): void {
   font-size: 15px !important;
 }
 
-.mermaid-flow :deep(svg .edgeLabel),
-.mermaid-flow :deep(svg .edgeLabel span),
-.mermaid-flow :deep(svg .edgeLabel p) {
-  font-size: 13px !important;
-  color: #cbd5e1 !important;
+.mermaid-flow :deep(svg .edgeLabel) {
+  pointer-events: none;
 }
 
 .mermaid-flow :deep(g.node.is-selected rect),

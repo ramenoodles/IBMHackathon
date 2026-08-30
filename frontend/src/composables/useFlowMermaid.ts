@@ -100,6 +100,18 @@ export function graphLabelKey(nodes: FlowNode[]): string {
     .join('|')
 }
 
+const EDGE_COLORS = {
+  true: '#4ade80',
+  false: '#f87171',
+  default: '#60a5fa',
+} as const
+
+function edgeColor(label?: string): string {
+  if (label === 'true') return EDGE_COLORS.true
+  if (label === 'false') return EDGE_COLORS.false
+  return EDGE_COLORS.default
+}
+
 export function compileToMermaid(
   nodes: FlowNode[],
   edges: FlowEdge[],
@@ -131,6 +143,9 @@ export function compileToMermaid(
     lines.push(`  class ${mid} ${classes.join(',')}`)
   }
 
+  const edgeIndices: { index: number; label?: string }[] = []
+  let edgeIdx = 0
+
   for (const edge of edges) {
     const fromIdx = indexById.get(edge.from)
     const toIdx = indexById.get(edge.to)
@@ -143,6 +158,13 @@ export function compileToMermaid(
     } else {
       lines.push(`  ${from} --> ${to}`)
     }
+    edgeIndices.push({ index: edgeIdx, label: edge.label })
+    edgeIdx++
+  }
+
+  for (const ei of edgeIndices) {
+    const color = edgeColor(ei.label)
+    lines.push(`  linkStyle ${ei.index} stroke:${color},stroke-width:2px`)
   }
 
   return lines.join('\n')
@@ -167,6 +189,68 @@ function applyNodeStyleClasses(group: SVGGElement, classes: string[]): void {
   for (const el of targets) {
     for (const cls of MERMAID_STYLE_CLASSES) el.classList.remove(cls)
     for (const cls of classes) el.classList.add(cls)
+  }
+}
+
+function hexAlpha(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+/**
+ * Post-process edge labels to add colored background pills and
+ * type-matching text colors matching IDA Pro flow arrow conventions.
+ */
+export function styleEdgeLabels(container: HTMLElement | null): void {
+  if (!container) return
+  for (const labelGroup of container.querySelectorAll('.edgeLabel')) {
+    const foreignEl = (labelGroup as Element).querySelector('foreignObject')
+    const div = foreignEl?.querySelector('div')
+    if (!foreignEl || !div) continue
+    const span = div.querySelector('span')
+    const labelText = span?.textContent?.trim() ?? div.textContent?.trim() ?? ''
+    if (!labelText) continue
+
+    const flowType = labelText === 'true' ? 'true' : labelText === 'false' ? 'false' : 'default'
+    const color = EDGE_COLORS[flowType]
+
+    // Mermaid sizes the label box without our pill padding; allow the pill
+    // to extend past the invisible container so its rounded edge isn't clipped.
+    foreignEl.style.setProperty('overflow', 'visible', 'important')
+
+    // Dark tinted chip matching the node-box styling language, so the label
+    // stays legible over whatever flows underneath it.
+    const chipBackground = {
+      true: 'rgba(21, 45, 28, 0.96)',
+      false: 'rgba(52, 22, 22, 0.96)',
+      default: 'rgba(13, 30, 56, 0.96)',
+    } as const
+
+    const set = (prop: string, val: string) => div.style.setProperty(prop, val, 'important')
+    set('background', chipBackground[flowType])
+    set('color', color)
+    set('padding', '2px 8px')
+    set('border-radius', '6px')
+    set('border', `1px solid ${hexAlpha(color, 0.55)}`)
+    set('box-shadow', '0 1px 2px rgba(0,0,0,0.35)')
+    set('font-size', '12px')
+    set('font-weight', '600')
+    set('line-height', '1.4')
+    set('letter-spacing', '0.2px')
+    set('white-space', 'nowrap')
+    set('box-sizing', 'border-box')
+
+    const stylize = (el: HTMLElement | null | undefined): void => {
+      if (!el) return
+      el.style.setProperty('color', color, 'important')
+      el.style.setProperty('background', 'transparent', 'important')
+    }
+    stylize(span)
+    stylize(span?.querySelector('p'))
+
+    labelGroup.classList.add(`flow-${flowType}`)
   }
 }
 
@@ -274,6 +358,7 @@ export function useFlowMermaid(
       const currentNodeList = toValue(nodes)
       const currentEdgeList = toValue(edges)
       applyLabelPatches(containerRef.value, currentNodeList)
+      styleEdgeLabels(containerRef.value)
       if (onNodeClick) attachNodeClicks(containerRef.value, currentNodeList, onNodeClick)
       applySelectionHighlight(containerRef.value, currentNodeList, toValue(selectedNodeId))
       // Sync both keys so subsequent syncFromGraph calls correctly classify
