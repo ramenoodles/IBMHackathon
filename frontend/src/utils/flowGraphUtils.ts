@@ -181,6 +181,46 @@ export function cloneSymbolFlowState(state: SymbolFlowState): SymbolFlowState {
   }
 }
 
+export function reachableNodeIds(
+  rootId: string,
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+): Set<string> {
+  if (!rootId) return new Set()
+  const visited = new Set<string>()
+  const queue = [rootId]
+
+  while (queue.length) {
+    const id = queue.shift()!
+    if (visited.has(id)) continue
+    visited.add(id)
+    for (const edge of edges) {
+      if (edge.from !== id || visited.has(edge.to)) continue
+      if (nodes.some((n) => n.id === edge.to)) {
+        queue.push(edge.to)
+      }
+    }
+  }
+
+  return visited
+}
+
+export function pruneGraphToRoot(
+  rootId: string,
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  if (!rootId) {
+    return { nodes: [...nodes], edges: [...edges] }
+  }
+
+  const reachable = reachableNodeIds(rootId, nodes, edges)
+  return {
+    nodes: nodes.filter((node) => reachable.has(node.id)),
+    edges: edges.filter((edge) => reachable.has(edge.from) && reachable.has(edge.to)),
+  }
+}
+
 export function entryOnlyRevealedIds(
   rootId: string,
   nodes: FlowNode[],

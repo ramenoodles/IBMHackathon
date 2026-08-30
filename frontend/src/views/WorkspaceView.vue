@@ -54,6 +54,7 @@ const {
   enriching,
   expanding,
   mappingFullFlow,
+  mappingProgress,
   fullyExpanded,
   error: graphError,
   isMock,
@@ -171,10 +172,29 @@ function onViewSource(file?: string, line?: number): void {
   sourceOpen.value = true
 }
 
-function onGoToDefinition(file: string, line: number): void {
-  sourcePath.value = file
-  sourceLine.value = line || undefined
-  sourceOpen.value = true
+async function onGoToDefinition(file: string, symbolName: string, line?: number): Promise<void> {
+if (!file || !symbolName) return
+
+sourceOpen.value = false
+sourcePath.value = ''
+sourceLine.value = undefined
+
+if (selectedPath.value === file) {
+  await onPickSymbol(symbolName)
+  return
+}
+
+selectedPath.value = file
+symbol.value = ''
+selectedNodeId.value = ''
+clearDetail()
+resetGraph()
+workspacePhase.value = 'tracing'
+await loadSymbols(userContext.value.workspaceId, file)
+
+const nextSymbol = symbols.value.find((s) => s.name === symbolName) ?? symbols.value[0]
+if (!nextSymbol) return
+await onPickSymbol(nextSymbol.name)
 }
 
 function onExpandNode(node: FlowNode): void {
@@ -263,6 +283,7 @@ function fileName(): string {
             :enriching="enriching"
             :expanding="expanding"
             :mapping-full-flow="mappingFullFlow"
+            :mapping-progress="mappingProgress"
             :fully-expanded="fullyExpanded"
             :error="graphError"
             :is-mock="isMock"

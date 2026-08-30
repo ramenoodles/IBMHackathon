@@ -57,6 +57,7 @@ const props = defineProps<{
   enriching: boolean
   expanding: boolean
   mappingFullFlow: boolean
+  mappingProgress: number
   fullyExpanded: boolean
   error: string | null
   isMock: boolean
@@ -76,7 +77,7 @@ const emit = defineEmits<{
   showFullFlow: []
   requestDetail: [node: FlowNode]
   viewSource: [file?: string, line?: number]
-  goToDefinition: [file: string, line: number]
+  goToDefinition: [file: string, symbol: string, line?: number]
 }>()
 
 const mermaidContainer = ref<HTMLElement | null>(null)
@@ -229,8 +230,6 @@ function openDeepDive(): void {
             {{ nodes.length }} step{{ nodes.length !== 1 ? 's' : '' }}
           </span>
           <div class="flex items-center gap-3">
-            <span v-if="mappingFullFlow" class="text-xs text-onbober-primary">Mapping full flow...</span>
-            <span v-else-if="expanding" class="text-xs text-onbober-primary">Expanding...</span>
             <div class="flex items-center gap-1">
               <button
                 type="button"
@@ -377,7 +376,19 @@ function openDeepDive(): void {
               v-if="mappingFullFlow"
               class="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm"
             >
-              <p class="text-sm text-slate-300">Mapping full flow for {{ symbol }}...</p>
+              <div class="w-full max-w-md rounded-lg border border-slate-700 bg-slate-900/90 p-4 shadow-lg shadow-slate-950/50">
+                <div class="mb-2 flex items-center justify-between text-sm">
+                  <span class="font-medium text-slate-200">Mapping full flow</span>
+                  <span class="font-mono text-onbober-primary">{{ Math.round(mappingProgress) }}%</span>
+                </div>
+                <div class="h-2 overflow-hidden rounded-full bg-slate-800">
+                  <div
+                    class="h-full rounded-full bg-gradient-to-r from-onbober-primary via-cyan-400 to-emerald-400 transition-[width] duration-500 ease-out"
+                    :style="{ width: `${mappingProgress}%` }"
+                  />
+                </div>
+                <p class="mt-3 text-xs text-slate-400">Expanding the execution graph for {{ symbol }}…</p>
+              </div>
             </div>
             <div ref="panContent" class="absolute inset-0 p-4">
               <div
@@ -514,7 +525,7 @@ function openDeepDive(): void {
             v-if="selectedNode.calleeFile"
             type="button"
             class="text-left text-sm text-onbober-primary hover:underline"
-            @click="emit('goToDefinition', selectedNode.calleeFile!, selectedNode.calleeLine ?? 1)"
+            @click="emit('goToDefinition', selectedNode.calleeFile!, selectedNode.calleeSymbol ?? selectedNode.label, selectedNode.calleeLine ?? 1)"
           >
             Go to {{ selectedNode.calleeSymbol }} ({{ selectedNode.calleeFile }}:{{ selectedNode.calleeLine }})
           </button>

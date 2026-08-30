@@ -12,6 +12,7 @@ import {
   SILENT_BUFFER_STEPS,
   entryOnlyRevealedIds,
   enrichmentHorizon,
+  pruneGraphToRoot,
   revealedPathLength,
   silentPrefetchTargets,
   type SymbolFlowState,
@@ -37,6 +38,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
   const enriching = ref(false)
   const expanding = ref(false)
   const mappingFullFlow = ref(false)
+  const mappingProgress = ref(0)
   const fullyExpanded = ref(false)
   const error = ref<string | null>(null)
   const isMock = ref(false)
@@ -64,8 +66,9 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
   }
 
   function hydrateFromState(state: SymbolFlowState, sym: string): void {
-    allNodes.value = state.allNodes.map((n) => ({ ...n }))
-    allEdges.value = [...state.allEdges]
+    const pruned = pruneGraphToRoot(state.rootId, state.allNodes, state.allEdges)
+    allNodes.value = pruned.nodes.map((n) => ({ ...n }))
+    allEdges.value = [...pruned.edges]
     rootId.value = state.rootId
     enrichedIds.value = new Set(state.enrichedIds)
     isMock.value = state.isMock
@@ -73,10 +76,16 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     fullyExpanded.value = state.fullyExpanded ?? false
     symbol.value = sym
 
+    const validRevealed = [...new Set(state.revealedIds ?? [])].filter((id) =>
+      allNodes.value.some((node) => node.id === id),
+    )
+
     if (fullyExpanded.value) {
-      revealedIds.value = new Set(state.allNodes.map((n) => n.id))
+      revealedIds.value = new Set(allNodes.value.map((n) => n.id))
+    } else if (validRevealed.length > 0) {
+      revealedIds.value = new Set(validRevealed)
     } else {
-      revealedIds.value = entryOnlyRevealedIds(state.rootId, state.allNodes, state.allEdges)
+      revealedIds.value = entryOnlyRevealedIds(state.rootId, allNodes.value, allEdges.value)
     }
     syncVisible()
   }
@@ -182,6 +191,14 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
       expanded.collapsed = false
       expanded.expandable = false
     }
+
+    const root = rootId.value || fragment.rootId
+    if (root) {
+      const pruned = pruneGraphToRoot(root, allNodes.value, allEdges.value)
+      allNodes.value = pruned.nodes
+      allEdges.value = pruned.edges
+    }
+
     if (revealAll || fullyExpanded.value) {
       for (const node of fragment.nodes) {
         revealedIds.value.add(node.id)
@@ -193,6 +210,11 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
   }
 
   function revealAllKnownNodes(): void {
+    if (rootId.value) {
+      const pruned = pruneGraphToRoot(rootId.value, allNodes.value, allEdges.value)
+      allNodes.value = pruned.nodes
+      allEdges.value = pruned.edges
+    }
     for (const node of allNodes.value) {
       revealedIds.value.add(node.id)
     }
@@ -222,10 +244,20 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
   ): Promise<void> {
     if (fullyExpanded.value || mappingFullFlow.value) return
 
+    if (rootId.value) {
+      const pruned = pruneGraphToRoot(rootId.value, allNodes.value, allEdges.value)
+      allNodes.value = pruned.nodes
+      allEdges.value = pruned.edges
+    }
+
     mappingFullFlow.value = true
+    mappingProgress.value = 0
     error.value = null
 
     try {
+      const initialCollapsed = collapsedExpandableNodes()
+      const total = Math.max(initialCollapsed.length, 1)
+      let processed = 0
       let guard = 0
       while (guard < 32) {
         guard++
@@ -245,12 +277,15 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
           )
           if (!fragment) continue
           mergeFragment(fragment, true)
+          processed += 1
+          mappingProgress.value = Math.min(100, Math.round((processed / total) * 100))
           expandedAny = true
         }
         if (!expandedAny) break
       }
 
       revealAllKnownNodes()
+      mappingProgress.value = 100
 
       const allIds = allNodes.value.map((n) => n.id)
       await enrichNodes(allIds, { background: false })
@@ -264,6 +299,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
       error.value = err instanceof Error ? err.message : 'Failed to map full flow'
     } finally {
       mappingFullFlow.value = false
+      mappingProgress.value = 100
     }
   }
 
@@ -299,13 +335,14 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
 
     try {
       const data = await fetchGraphRoot(payload)
-      allNodes.value = data.nodes
-      allEdges.value = data.edges
+      const pruned = pruneGraphToRoot(data.rootId, data.nodes, data.edges)
+      allNodes.value = pruned.nodes
+      allEdges.value = pruned.edges
       rootId.value = data.rootId
       isMock.value = Boolean(data.mock) && data.nodes.length === 0
 
       if (data.rootId) {
-        revealedIds.value = entryOnlyRevealedIds(data.rootId, data.nodes, data.edges)
+        revealedIds.value = entryOnlyRevealedIds(data.rootId, allNodes.value, allEdges.value)
       }
       syncVisible()
       loading.value = false
@@ -369,6 +406,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     isMock.value = false
     fullyExpanded.value = false
     mappingFullFlow.value = false
+    mappingProgress.value = 0
     parentPath.value = []
     lastPayload.value = null
   }
@@ -382,6 +420,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     enriching,
     expanding,
     mappingFullFlow,
+    mappingProgress,
     fullyExpanded,
     error,
     isMock,

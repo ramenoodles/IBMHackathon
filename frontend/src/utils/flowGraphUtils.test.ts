@@ -5,6 +5,7 @@ import {
   bfsNodeIds,
   createSymbolFlowState,
   enrichmentHorizon,
+  pruneGraphToRoot,
   silentPrefetchTargets,
 } from '@/utils/flowGraphUtils'
 import type { FlowEdge, FlowNode } from '@/types/flowGraph'
@@ -67,5 +68,23 @@ describe('createSymbolFlowState', () => {
       3,
     )
     expect([...state.revealedIds]).toEqual(['a', 'b', 'c'])
+  })
+})
+
+describe('pruneGraphToRoot', () => {
+  it('drops disconnected nodes that are not reachable from the current root', () => {
+    const staleNodes: FlowNode[] = [
+      ...nodes,
+      { id: 'x', label: 'x', summary: '', kind: 'call', confidence: 'verified', expandable: false, childCount: 0, collapsed: false },
+    ]
+    const staleEdges: FlowEdge[] = [
+      ...edges,
+      { from: 'x', to: 'a', label: 'then' },
+    ]
+
+    const pruned = pruneGraphToRoot('a', staleNodes, staleEdges)
+
+    expect(pruned.nodes.map((n) => n.id)).toEqual(['a', 'b', 'c', 'd'])
+    expect(pruned.edges.map((e) => `${e.from}->${e.to}`)).toEqual(['a->b', 'b->c', 'c->d'])
   })
 })
