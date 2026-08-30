@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,20 +42,16 @@ def unrelated():
 }
 
 func TestRootIsBoundedAndMarksOmittedSteps(t *testing.T) {
+	// Build a Python function with MaxRootNodes+10 body lines so it always
+	// exceeds the limit regardless of the current constant value.
 	root := t.TempDir()
-	writeTestFile(t, root, "busy.py", `def busy():
-    one = 1
-    two = 2
-    three = 3
-    four = 4
-    five = 5
-    six = 6
-    seven = 7
-    eight = 8
-    nine = 9
-    ten = 10
-    return ten
-`)
+	var body strings.Builder
+	body.WriteString("def busy():\n")
+	for i := 0; i < MaxRootNodes+10; i++ {
+		fmt.Fprintf(&body, "    v%d = %d\n", i, i)
+	}
+	body.WriteString("    return 0\n")
+	writeTestFile(t, root, "busy.py", body.String())
 
 	graph, err := newTestBuilder(t, root).Root(context.Background(), "busy.py", "busy")
 	if err != nil {
