@@ -52,6 +52,19 @@ func TestContextualHeuristicReturn(t *testing.T) {
 	}
 }
 
+func TestBuildEnrichPromptMidAudience(t *testing.T) {
+	prompt := buildEnrichPrompt(EnrichRequest{
+		Symbol: "close",
+		UserContext: EnrichUserContext{
+			ExperienceLevel: "mid",
+			PrimaryLanguage: "go",
+		},
+	}, []EnrichNodeInput{{ID: "a", Code: "m.mu.Lock()", Kind: "call"}})
+	if !contains(prompt, "mid-level developer") {
+		t.Fatalf("prompt missing mid audience: %q", prompt)
+	}
+}
+
 func TestEnrichUsesContextualHeuristicsWithoutLLM(t *testing.T) {
 	service := newTestService(t, nil, false)
 	result, err := service.Enrich(context.Background(), EnrichRequest{

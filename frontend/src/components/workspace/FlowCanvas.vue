@@ -5,6 +5,7 @@
 import type { FlowEdge, FlowNode, NodeDetail } from '@/types/flowGraph'
 import { computed, nextTick, ref, watch } from 'vue'
 import MarkdownView from '@/components/workspace/MarkdownView.vue'
+import BeaverFlowLoader from '@/components/ui/BeaverFlowLoader.vue'
 import LoadingStatus from '@/components/ui/LoadingStatus.vue'
 import { graphStructureKey, nodeDisplayTitle, useFlowMermaid } from '@/composables/useFlowMermaid'
 import { useFlowPanZoom } from '@/composables/useFlowPanZoom'
@@ -241,8 +242,12 @@ function openDeepDive(): void {
         No scan data for this symbol
       </div>
 
-      <div v-if="loading" class="flex flex-1 items-center justify-center text-sm text-slate-500">
-        Mapping execution path...
+      <div v-if="loading" class="flex flex-1 items-center justify-center px-6">
+        <BeaverFlowLoader
+          mode="indeterminate"
+          :active="loading"
+          class="w-full max-w-2xl"
+        />
       </div>
 
       <div v-else-if="!symbol" class="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
@@ -475,21 +480,15 @@ function openDeepDive(): void {
           >
             <div
               v-if="mappingFullFlow"
-              class="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm"
+              class="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm px-4"
             >
-              <div class="w-full max-w-md rounded-lg border border-slate-700 bg-slate-900/90 p-4 shadow-lg shadow-slate-950/50">
-                <div class="mb-2 flex items-center justify-between text-sm">
-                  <span class="font-medium text-slate-200">Mapping full flow</span>
-                  <span class="font-mono text-onbober-primary">{{ Math.round(mappingProgress) }}%</span>
-                </div>
-                <div class="h-2 overflow-hidden rounded-full bg-slate-800">
-                  <div
-                    class="h-full rounded-full bg-gradient-to-r from-onbober-primary via-cyan-400 to-emerald-400 transition-[width] duration-500 ease-out"
-                    :style="{ width: `${mappingProgress}%` }"
-                  />
-                </div>
-                <p class="mt-3 text-xs text-slate-400">Expanding the execution graph for {{ symbol }}…</p>
-              </div>
+              <BeaverFlowLoader
+                mode="progress"
+                :active="mappingFullFlow"
+                :progress="mappingProgress"
+                compact
+                class="w-full max-w-2xl"
+              />
             </div>
             <div ref="panContent" class="absolute inset-0 p-4">
               <div

@@ -29,6 +29,11 @@ import {
   BEAVER_LOADER_HOLD_MS,
   delay,
 } from '@/constants/beaverLoader'
+import {
+  EXPERIENCE_EFFECT_BULLETS,
+  EXPERIENCE_EFFECT_SUMMARY,
+  EXPERIENCE_LEVELS,
+} from '@/constants/experienceLevel'
 
 const router = useRouter()
 const { loading, error, setupLocal, setupGitHub, setupDemo, setupZip } = useWorkspaceSetup()
@@ -73,12 +78,6 @@ const filteredLanguages = computed(() => {
   if (!q) return ALL_LANGUAGES
   return ALL_LANGUAGES.filter((l) => l.label.toLowerCase().includes(q))
 })
-
-const levels: { value: ExperienceLevel; label: string }[] = [
-  { value: 'junior', label: 'Junior SWE' },
-  { value: 'mid', label: 'Mid-level SWE' },
-  { value: 'senior', label: 'Senior SWE' },
-]
 
 // Restore from stored comma-separated labels, matching both stored value and label.
 const storedLang = userContext.value.primaryLanguage || ''
@@ -291,10 +290,10 @@ function onSourceKeydown(event: KeyboardEvent): void {
 
       <div v-else-if="step === 2">
         <h2 class="mb-2 text-2xl font-bold text-white">What is your experience level?</h2>
-        <p class="mb-6 text-slate-400">This helps calibrate explanation depth.</p>
+        <p class="mb-4 text-slate-400">{{ EXPERIENCE_EFFECT_SUMMARY }}</p>
         <div class="space-y-3">
           <button
-            v-for="level in levels"
+            v-for="level in EXPERIENCE_LEVELS"
             :key="level.value"
             type="button"
             class="w-full rounded-lg border px-4 py-3 text-left transition"
@@ -305,8 +304,15 @@ function onSourceKeydown(event: KeyboardEvent): void {
             "
             @click="selectedLevel = level.value"
           >
-            {{ level.label }}
+            <span class="block font-medium">{{ level.label }}</span>
+            <span class="mt-1 block text-sm text-slate-400">{{ level.description }}</span>
           </button>
+        </div>
+        <div class="mt-5 rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">What this affects</p>
+          <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-slate-400">
+            <li v-for="item in EXPERIENCE_EFFECT_BULLETS" :key="item">{{ item }}</li>
+          </ul>
         </div>
       </div>
 

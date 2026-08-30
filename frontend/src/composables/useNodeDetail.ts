@@ -18,7 +18,7 @@ export interface NodeDetailParams {
 }
 
 function cacheKey(params: NodeDetailParams): string {
-  return `${params.file ?? ''}::${params.symbol}::${params.nodeId}`
+  return `${params.file ?? ''}::${params.symbol}::${params.nodeId}::${params.experience ?? ''}`
 }
 
 function buildQuery(params: NodeDetailParams): URLSearchParams {
@@ -64,6 +64,10 @@ export function useNodeDetail() {
 
   function setCached(params: NodeDetailParams, value: NodeDetail): void {
     cache.set(cacheKey(params), value)
+  }
+
+  function clearCache(): void {
+    cache.clear()
   }
 
   function clear(): void {
@@ -205,5 +209,5 @@ export function useNodeDetail() {
     }
   }
 
-  return { detail, loading, streaming, error, loadDetail, getCached, clear }
+  return { detail, loading, streaming, error, loadDetail, getCached, clear, clearCache }
 }

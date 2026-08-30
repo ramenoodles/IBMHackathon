@@ -174,6 +174,8 @@ func buildEnrichPrompt(req EnrichRequest, nodes []EnrichNodeInput) string {
 	switch strings.ToLower(strings.TrimSpace(req.UserContext.ExperienceLevel)) {
 	case "junior":
 		b.WriteString("Audience: junior developer — use plain language and briefly define jargon.\n")
+	case "mid":
+		b.WriteString("Audience: mid-level developer — assume language fundamentals; explain codebase-specific behavior in one clear sentence.\n")
 	case "senior":
 		b.WriteString("Audience: senior developer — focus on intent and non-obvious behavior.\n")
 	default:
