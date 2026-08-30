@@ -23,6 +23,54 @@ let editor: any = null
 let monaco: any = null
 let decorationIds: string[] = []
 
+function applyMonacoTheme(monacoInstance: any): void {
+  monacoInstance.editor.defineTheme('onbober-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: '', foreground: 'e2e8f0', background: '0f172a' },
+      { token: 'comment', foreground: '64748b' },
+      { token: 'keyword', foreground: 'c084fc' },
+      { token: 'string', foreground: 'a5f3fc' },
+      { token: 'number', foreground: 'f9a8d4' },
+      { token: 'type', foreground: '93c5fd' },
+      { token: 'delimiter', foreground: 'cbd5e1' },
+    ],
+    colors: {
+      'editor.background': '#0f172a',
+      'editor.foreground': '#e2e8f0',
+      'editorCursor.foreground': '#f8fafc',
+      'editor.selectionBackground': '#334155',
+      'editor.inactiveSelectionBackground': '#1e293b',
+      'editor.lineHighlightBackground': '#111827',
+      'editor.lineHighlightBorder': '#1e293b',
+      'editorLineNumber.foreground': '#64748b',
+      'editorLineNumber.activeForeground': '#e2e8f0',
+      'editorIndentGuide.background': '#334155',
+      'editorIndentGuide.activeBackground': '#94a3b8',
+      'editorWhitespace.foreground': '#334155',
+      'editorGutter.background': '#0f172a',
+      'scrollbarSlider.background': '#475569',
+      'scrollbarSlider.hoverBackground': '#64748b',
+      'scrollbarSlider.activeBackground': '#94a3b8',
+      'minimap.background': '#0f172a',
+      'minimapSlider.background': '#334155',
+      'minimapSlider.hoverBackground': '#475569',
+      'minimapSlider.activeBackground': '#64748b',
+      'editorSuggestWidget.background': '#0f172a',
+      'editorSuggestWidget.border': '#334155',
+      'editorWidget.background': '#111827',
+      'editorWidget.border': '#334155',
+      'list.activeSelectionBackground': '#334155',
+      'list.hoverBackground': '#1e293b',
+      'editorHoverWidget.background': '#111827',
+      'editorHoverWidget.border': '#334155',
+    },
+  })
+
+  monacoInstance.editor.setTheme('onbober-dark')
+}
+
 /** Map common language ids to Monaco's language ids */
 function monacoLanguage(lang?: string): string {
   const map: Record<string, string> = {
@@ -78,11 +126,12 @@ onMounted(async () => {
   })
 
   monaco = await loader.init()
+  applyMonacoTheme(monaco)
 
   editor = monaco.editor.create(container.value, {
     value: props.content,
     language: monacoLanguage(props.language),
-    theme: 'vs-dark',
+    theme: 'onbober-dark',
     readOnly: true,
     automaticLayout: true,
     scrollBeyondLastLine: false,

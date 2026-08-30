@@ -121,6 +121,10 @@ function onGraphRender(reason: 'structure' | 'label'): void {
 }
 
 function onNodeClick(node: FlowNode): void {
+  if (!props.fullyExpanded && node.collapsed && node.expandable) {
+    emit('expandNode', node)
+    return
+  }
   if (props.hasHiddenChildren(node.id)) {
     emit('revealNode', node)
   }
@@ -196,12 +200,6 @@ const orderedNodes = computed(() => {
 
 const selectedNode = computed(() => props.nodes.find((n) => n.id === props.selectedNodeId))
 const hasDetailContent = computed(() => Boolean(props.selectedNodeId && selectedNode.value))
-
-watch(selectedNode, (node) => {
-  if (node && isCompactNode(node) && !detailPanelOpen.value) {
-    detailPanelOpen.value = true
-  }
-})
 const showEnrichedSummary = computed(() => {
   const node = selectedNode.value
   if (!node?.summary?.trim()) return false
@@ -292,7 +290,7 @@ function openDeepDive(): void {
                 <span class="h-2.5 w-2.5 rounded-sm border-2 border-cyan-400 bg-cyan-950" />
                 Auto
               </span>
-              <span class="flex items-center gap-1" title="Callee folded into one node — select step, then View code flow in Details">
+              <span class="flex items-center gap-1" title="Callee folded into one node — preview or click to expand">
                 <span class="h-2.5 w-2.5 rounded-sm border-2 border-onbober-primary bg-slate-800" />
                 Compact
               </span>
@@ -748,11 +746,8 @@ function openDeepDive(): void {
   font-size: 15px !important;
 }
 
-.mermaid-flow :deep(svg .edgeLabel),
-.mermaid-flow :deep(svg .edgeLabel span),
-.mermaid-flow :deep(svg .edgeLabel p) {
-  font-size: 13px !important;
-  color: #cbd5e1 !important;
+.mermaid-flow :deep(svg .edgeLabel) {
+  pointer-events: none;
 }
 
 .mermaid-flow :deep(g.node.is-selected rect),

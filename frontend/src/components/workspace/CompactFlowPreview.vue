@@ -9,18 +9,14 @@ import type { FlowEdge, FlowNode, GraphRootPayload } from '@/types/flowGraph'
 import { useFlowMermaid } from '@/composables/useFlowMermaid'
 import { enrichSymbolNodes } from '@/utils/flowGraphEnrich'
 
-const props = withDefaults(
-  defineProps<{
-    open: boolean
-    workspaceId: string
-    filePath: string
-    symbol: string
-    line?: number
-    userContext: GraphRootPayload['userContext']
-    scanOnly?: boolean
-  }>(),
-  { scanOnly: true },
-)
+const props = defineProps<{
+  open: boolean
+  workspaceId: string
+  filePath: string
+  symbol: string
+  line?: number
+  userContext: GraphRootPayload['userContext']
+}>()
 
 const emit = defineEmits<{
   close: []
@@ -35,10 +31,6 @@ const mermaidContainer = ref<HTMLElement | null>(null)
 const { setContainer, renderError } = useFlowMermaid(
   () => nodes.value,
   () => edges.value,
-  '',
-  undefined,
-  undefined,
-  'scan',
 )
 
 watch(mermaidContainer, (el) => setContainer(el))
@@ -58,34 +50,32 @@ async function loadPreview(): Promise<void> {
     })
     nodes.value = graph.nodes
     edges.value = graph.edges
-
-    if (!props.scanOnly) {
-      void enrichSymbolNodes(
-        nodes.value,
-        {
-          workspaceId: props.workspaceId,
-          filePath: props.filePath,
-          symbol: props.symbol,
-          userContext: props.userContext,
-        },
-        graph.nodes.map((n) => n.id),
-      ).then((result) => {
-        const byId = new Map(nodes.value.map((n) => [n.id, n]))
-        for (const patch of result.patches) {
-          const node = byId.get(patch.id)
-          if (!node) continue
-          if (patch.title) node.title = patch.title
-          if (patch.summary) node.summary = patch.summary
-          if (patch.labelSource) {
-            node.labelSource = patch.labelSource as FlowNode['labelSource']
-            if (patch.labelSource === 'ai' || patch.labelSource === 'heuristic') {
-              node.confidence = 'inferred'
-            }
+    const nodeCopies = nodes.value.map((n) => ({ ...n }))
+    void enrichSymbolNodes(
+      nodeCopies,
+      {
+        workspaceId: props.workspaceId,
+        filePath: props.filePath,
+        symbol: props.symbol,
+        userContext: props.userContext,
+      },
+      graph.nodes.map((n) => n.id),
+    ).then((result) => {
+      const byId = new Map(nodeCopies.map((n) => [n.id, n]))
+      for (const patch of result.patches) {
+        const node = byId.get(patch.id)
+        if (!node) continue
+        if (patch.title) node.title = patch.title
+        if (patch.summary) node.summary = patch.summary
+        if (patch.labelSource) {
+          node.labelSource = patch.labelSource as FlowNode['labelSource']
+          if (patch.labelSource === 'ai' || patch.labelSource === 'heuristic') {
+            node.confidence = 'inferred'
           }
         }
-        nodes.value = [...nodes.value]
-      })
-    }
+      }
+      nodes.value = nodeCopies
+    })
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load compacted flow'
   } finally {
@@ -94,7 +84,7 @@ async function loadPreview(): Promise<void> {
 }
 
 watch(
-  () => [props.open, props.filePath, props.symbol, props.scanOnly] as const,
+  () => [props.open, props.filePath, props.symbol] as const,
   () => {
     if (props.open) void loadPreview()
   },
@@ -105,7 +95,7 @@ watch(
 <template>
   <Modal
     :open="open"
-    :title="`Code flow: ${symbol}()`"
+    :title="`Preview: ${symbol}()`"
     size="xl"
     @close="emit('close')"
   >
@@ -113,7 +103,7 @@ watch(
       <p v-if="filePath" class="mb-3 shrink-0 font-mono text-xs text-slate-500">
         {{ filePath }}<span v-if="line">:{{ line }}</span>
       </p>
-      <p v-if="loading" class="py-8 text-center text-sm text-slate-400">Loading code flow…</p>
+      <p v-if="loading" class="py-8 text-center text-sm text-slate-400">Loading compacted flow…</p>
       <p v-else-if="error" class="py-8 text-center text-sm text-red-400">{{ error }}</p>
       <p v-else-if="renderError" class="py-8 text-center text-sm text-red-400">{{ renderError }}</p>
       <div
@@ -126,7 +116,7 @@ watch(
         />
       </div>
       <p class="mt-3 shrink-0 text-xs text-slate-500">
-        Read-only · scan labels (no AI)
+        Read-only preview. Click the compact node in the main flow to inline-expand.
       </p>
     </div>
   </Modal>
@@ -144,5 +134,9 @@ watch(
 .mermaid-flow-preview :deep(svg foreignObject div) {
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace !important;
   font-size: 14px !important;
+}
+
+.mermaid-flow-preview :deep(svg .edgeLabel) {
+  pointer-events: none;
 }
 </style>
