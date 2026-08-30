@@ -6,8 +6,7 @@ import { computed, ref } from 'vue'
 import Sidebar from '@/components/workspace/Sidebar.vue'
 import SymbolBar from '@/components/workspace/SymbolBar.vue'
 import FlowCanvas from '@/components/workspace/FlowCanvas.vue'
-import FileFlowBrief from '@/components/workspace/FileFlowBrief.vue'
-import FlowWarmOverlay from '@/components/workspace/FlowWarmOverlay.vue'
+import SymbolLoadPrompt from '@/components/workspace/SymbolLoadPrompt.vue'
 import BranchPrompt from '@/components/workspace/BranchPrompt.vue'
 import Modal from '@/components/ui/Modal.vue'
 import CodePanel from '@/components/workspace/CodePanel.vue'
@@ -17,12 +16,11 @@ import { useHorizontalResize } from '@/composables/usePanelResize'
 import { useFlowGraphCache } from '@/composables/useFlowGraphCache'
 import { useFlowGraph } from '@/composables/useFlowGraph'
 import { useSymbolBrief } from '@/composables/useSymbolBrief'
-import { useFileFlowWarm } from '@/composables/useFileFlowWarm'
 import { useNodeDetail } from '@/composables/useNodeDetail'
 import { userContext } from '@/store/userContext'
 import type { FlowNode } from '@/types/flowGraph'
 
-type WorkspacePhase = 'idle' | 'brief' | 'warming' | 'tracing'
+type WorkspacePhase = 'idle' | 'brief' | 'tracing'
 
 const {
   sidebarOpen,
@@ -67,9 +65,21 @@ const {
   reset: resetGraph,
 } = useFlowGraph(graphCache)
 
-const { symbols, loading: symbolsLoading, error: symbolsError, isLargeFile, load: loadSymbols, reset: resetSymbols } =
-  useSymbolBrief()
-const { warming, progress, warmFile } = useFileFlowWarm(graphCache)
+const {
+  symbols,
+  currentPageSymbols,
+  currentPage,
+  totalPages,
+  hasNextPage,
+  hasPrevPage,
+  loading: symbolsLoading,
+  error: symbolsError,
+  load: loadSymbols,
+  reset: resetSymbols,
+  advancePage,
+  prevPage,
+  goToPage,
+} = useSymbolBrief()
 const { detail, loading: detailLoading, streaming: detailStreaming, error: detailError, loadDetail, clear: clearDetail } = useNodeDetail()
 
 const workspacePhase = ref<WorkspacePhase>('idle')
@@ -78,21 +88,15 @@ const symbol = ref('')
 const selectedNodeId = ref('')
 const sourceOpen = ref(false)
 const sourcePath = ref('')
-const warmedSymbolNames = ref<string[]>([])
 
 const branchPromptOpen = ref(false)
 const branchNode = ref<FlowNode | null>(null)
 
 const showSymbolBar = computed(
-  () =>
-    selectedPath.value &&
-    (workspacePhase.value === 'tracing' || workspacePhase.value === 'warming'),
+  () => selectedPath.value && workspacePhase.value === 'tracing',
 )
 
-const symbolBarNames = computed(() => {
-  if (warmedSymbolNames.value.length) return warmedSymbolNames.value
-  return symbols.value.map((s) => s.name)
-})
+const symbolBarNames = computed(() => currentPageSymbols.value.map((s) => s.name))
 
 function graphPayload() {
   return {
@@ -108,24 +112,8 @@ async function onSelectFile(path: string): Promise<void> {
   symbol.value = ''
   selectedNodeId.value = ''
   clearDetail()
-  warmedSymbolNames.value = []
+  resetSymbols()
   resetGraph()
-
-  if (graphCache.isFileWarmed(path)) {
-    warmedSymbolNames.value = graphCache.listSymbolsForFile(path)
-    workspacePhase.value = 'tracing'
-    if (warmedSymbolNames.value[0]) {
-      symbol.value = warmedSymbolNames.value[0]
-      activateSymbol(warmedSymbolNames.value[0], {
-        workspacePath: userContext.value.workspacePath,
-        filePath: path,
-        symbol: warmedSymbolNames.value[0],
-        userContext: { ...userContext.value },
-      })
-    }
-    return
-  }
-
   workspacePhase.value = 'brief'
   await loadSymbols(userContext.value.workspacePath, path)
 }
@@ -134,20 +122,8 @@ function onDeclineFlowInit(): void {
   workspacePhase.value = 'tracing'
 }
 
-async function onConfirmFlowInit(selected: string[]): Promise<void> {
-  if (!selectedPath.value || !selected.length) return
-  workspacePhase.value = 'warming'
-  warmedSymbolNames.value = selected
-  const base = {
-    workspacePath: userContext.value.workspacePath,
-    filePath: selectedPath.value,
-    userContext: { ...userContext.value },
-  }
-  await warmFile(base, selected)
+function onConfirmFlowInit(): void {
   workspacePhase.value = 'tracing'
-  symbol.value = selected[0]!
-  selectedNodeId.value = ''
-  activateSymbol(selected[0]!, { ...base, symbol: selected[0]! })
 }
 
 async function onPickSymbol(name: string): Promise<void> {
@@ -278,22 +254,28 @@ function fileName(): string {
           :file-path="selectedPath"
           :active-symbol="symbol"
           :symbol-names="symbolBarNames"
+          :has-next-page="hasNextPage"
+          :has-prev-page="hasPrevPage"
+          :current-page="currentPage"
+          :total-pages="totalPages"
           @pick="onPickSymbol"
+          @next-page="advancePage"
+          @prev-page="prevPage"
+          @go-to-page="goToPage"
         />
 
-        <FileFlowBrief
+        <SymbolLoadPrompt
           v-if="workspacePhase === 'brief' && selectedPath"
           :file-name="fileName()"
-          :symbols="symbols"
           :loading="symbolsLoading"
           :error="symbolsError"
-          :is-large-file="isLargeFile"
+          :symbol-count="symbols.length"
           @confirm="onConfirmFlowInit"
           @decline="onDeclineFlowInit"
         />
 
         <FlowCanvas
-          v-else-if="workspacePhase === 'tracing' || workspacePhase === 'warming'"
+          v-else-if="workspacePhase === 'tracing'"
           :nodes="nodes"
           :edges="edges"
           :root-id="rootId"
@@ -321,20 +303,12 @@ function fileName(): string {
         />
 
         <div
-          v-else
+          v-else-if="workspacePhase !== 'brief'"
           class="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-slate-500"
         >
           <p class="text-lg font-medium text-slate-300">Select a file to begin</p>
           <p class="max-w-sm text-sm">Choose a file from the explorer to see traceable symbols.</p>
         </div>
-
-        <FlowWarmOverlay
-          :open="workspacePhase === 'warming' && warming"
-          :file-name="fileName()"
-          :done="progress.done"
-          :total="progress.total"
-          :current-symbol="progress.currentSymbol"
-        />
       </div>
     </div>
 
