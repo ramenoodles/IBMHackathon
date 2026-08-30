@@ -30,7 +30,7 @@ def parent():
 		t.Fatal(err)
 	}
 
-	manager, err := workspace.NewManager(workspace.Limits{})
+	manager, err := workspace.NewManager(workspace.Limits{AllowLocalSource: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ def parent():
 }
 
 func TestGraphRootRequiresFilePath(t *testing.T) {
-	manager, err := workspace.NewManager(workspace.Limits{})
+	manager, err := workspace.NewManager(workspace.Limits{AllowLocalSource: true})
 	if err != nil {
 		t.Fatal(err)
 	}

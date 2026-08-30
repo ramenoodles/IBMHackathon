@@ -23,9 +23,11 @@ func main() {
 
 	cfg := config.FromEnvironment()
 	m, e := workspace.NewManager(workspace.Limits{
-		MaxRepoBytes: cfg.MaxRepoBytes,
-		MaxZipFiles:  cfg.MaxZipFiles,
-		CloneTimeout: cfg.CloneTimeout,
+		MaxRepoBytes:     cfg.MaxRepoBytes,
+		MaxZipFiles:      cfg.MaxZipFiles,
+		CloneTimeout:     cfg.CloneTimeout,
+		AllowLocalSource: cfg.AllowLocalSource,
+		WorkspaceMaxAge:  cfg.WorkspaceMaxAge,
 	})
 	if e != nil {
 		log.Fatal(e)

@@ -33,9 +33,11 @@ type Workspace struct {
 // Limits bounds how much untrusted input a workspace creation can consume.
 // Zero values fall back to the package defaults.
 type Limits struct {
-	MaxRepoBytes int64
-	MaxZipFiles  int
-	CloneTimeout time.Duration
+	MaxRepoBytes     int64
+	MaxZipFiles      int
+	CloneTimeout     time.Duration
+	AllowLocalSource bool
+	WorkspaceMaxAge  time.Duration
 }
 
 type Manager struct {
@@ -43,6 +45,7 @@ type Manager struct {
 	items    map[string]Workspace
 	tempRoot string
 	limits   Limits
+	stop     chan struct{}
 }
 
 func NewManager(limits Limits) (*Manager, error) {
@@ -59,9 +62,15 @@ func NewManager(limits Limits) (*Manager, error) {
 	if limits.CloneTimeout <= 0 {
 		limits.CloneTimeout = config.DefaultCloneTimeout
 	}
-	return &Manager{items: map[string]Workspace{}, tempRoot: root, limits: limits}, nil
+	if limits.WorkspaceMaxAge <= 0 {
+		limits.WorkspaceMaxAge = config.DefaultWorkspaceMaxAge
+	}
+	m := &Manager{items: map[string]Workspace{}, tempRoot: root, limits: limits, stop: make(chan struct{})}
+	go m.evictLoop()
+	return m, nil
 }
 func (m *Manager) Close() error {
+	close(m.stop)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, w := range m.items {
@@ -70,6 +79,35 @@ func (m *Manager) Close() error {
 		}
 	}
 	return os.RemoveAll(m.tempRoot)
+}
+
+// evictLoop periodically removes workspaces older than WorkspaceMaxAge so the
+// VPS does not accumulate clones/zips from every visitor indefinitely.
+func (m *Manager) evictLoop() {
+	ticker := time.NewTicker(m.limits.WorkspaceMaxAge / 2)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-m.stop:
+			return
+		case <-ticker.C:
+			m.evict()
+		}
+	}
+}
+
+func (m *Manager) evict() {
+	cutoff := time.Now().Add(-m.limits.WorkspaceMaxAge)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, w := range m.items {
+		if w.CreatedAt.Before(cutoff) {
+			if w.Temporary {
+				_ = os.RemoveAll(w.Root)
+			}
+			delete(m.items, id)
+		}
+	}
 }
 func (m *Manager) Get(id string) (Workspace, bool) {
 	m.mu.RLock()
@@ -97,6 +135,9 @@ func randomID() string {
 	return fmt.Sprintf("ws-%x", b)
 }
 func (m *Manager) Local(path string) (Workspace, error) {
+	if !m.limits.AllowLocalSource {
+		return Workspace{}, fmt.Errorf("local source is disabled on this server")
+	}
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return Workspace{}, err
@@ -198,7 +239,7 @@ func (m *Manager) Zip(file io.Reader, name string, size int64) (Workspace, error
 		_ = os.RemoveAll(dir)
 		return Workspace{}, err
 	}
-	archive, err := os.CreateTemp("", "workspace-*.zip")
+	archive, err := os.CreateTemp(m.tempRoot, "workspace-*.zip")
 	if err != nil {
 		return Workspace{}, err
 	}

@@ -8,12 +8,13 @@ import (
 
 // Defaults for the safety limits the server enforces.
 const (
-	DefaultMaxBodyBytes  = 200 << 20 // max request body (upload) size
-	DefaultMaxFileBytes  = 2 << 20   // max per-file size the reader will open
-	DefaultMaxRepoBytes  = 200 << 20 // max workspace/clone/zip size
-	DefaultMaxZipFiles   = 50_000    // max entries accepted from a zip upload
+	DefaultMaxBodyBytes   = 200 << 20       // max request body (upload) size
+	DefaultMaxFileBytes   = 2 << 20         // max per-file size the reader will open
+	DefaultMaxRepoBytes   = 200 << 20       // max workspace/clone/zip size
+	DefaultMaxZipFiles    = 50_000          // max entries accepted from a zip upload
 	DefaultRequestTimeout = 120 * time.Second
 	DefaultCloneTimeout   = 120 * time.Second
+	DefaultWorkspaceMaxAge = 30 * time.Minute // workspaces older than this are evicted
 )
 
 type Config struct {
@@ -29,6 +30,13 @@ type Config struct {
 	MaxZipFiles      int
 	RequestTimeout   time.Duration
 	CloneTimeout     time.Duration
+	// AllowLocalSource controls whether the "local" workspace source is accepted.
+	// It is disabled by default; set ALLOW_LOCAL_SOURCE=true only in trusted
+	// development environments where the server process has no sensitive files.
+	AllowLocalSource bool
+	// WorkspaceMaxAge is the time after which unused workspaces are evicted.
+	// Zero disables eviction (not recommended for public deployments).
+	WorkspaceMaxAge time.Duration
 }
 
 func FromEnvironment() Config {
@@ -45,6 +53,8 @@ func FromEnvironment() Config {
 		MaxZipFiles:      envInt("MAX_ZIP_FILES", DefaultMaxZipFiles),
 		RequestTimeout:   durationEnv("REQUEST_TIMEOUT_SECONDS", DefaultRequestTimeout),
 		CloneTimeout:     durationEnv("CLONE_TIMEOUT_SECONDS", DefaultCloneTimeout),
+		AllowLocalSource: os.Getenv("ALLOW_LOCAL_SOURCE") == "true",
+		WorkspaceMaxAge:  durationEnv("WORKSPACE_MAX_AGE_SECONDS", DefaultWorkspaceMaxAge),
 	}
 }
 

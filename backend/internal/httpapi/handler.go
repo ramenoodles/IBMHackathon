@@ -202,6 +202,7 @@ func (h *Handler) symbols(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, map[string]any{"symbols": out, "count": len(out)})
 }
 func (h *Handler) graph(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, h.MaxBodyBytes)
 	ws, ok := h.get(w, r)
 	if !ok {
 		return
@@ -227,6 +228,7 @@ func (h *Handler) graph(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, g)
 }
 func (h *Handler) expand(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, h.MaxBodyBytes)
 	ws, ok := h.get(w, r)
 	if !ok {
 		return
@@ -255,6 +257,7 @@ func (h *Handler) expand(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, g)
 }
 func (h *Handler) enrich(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, h.MaxBodyBytes)
 	ws, ok := h.get(w, r)
 	if !ok {
 		return
@@ -303,6 +306,7 @@ func (h *Handler) enrich(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) explain(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, h.MaxBodyBytes)
 	ws, ok := h.get(w, r)
 	if !ok {
 		return
