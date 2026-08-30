@@ -6,7 +6,6 @@ import { onUnmounted, ref, type Ref } from 'vue'
  */
 export function useFlowPanZoom(viewportRef: Ref<HTMLElement | null>, contentRef: Ref<HTMLElement | null>) {
   const panzoom = ref<PanzoomObject | null>(null)
-  const isFitted = ref(false)
 
   function bind(): void {
     unbind()
@@ -28,9 +27,7 @@ export function useFlowPanZoom(viewportRef: Ref<HTMLElement | null>, contentRef:
 
     panzoom.value = instance
 
-    // Any wheel zoom counts as a user interaction — clear fitted state
     const onWheel = (e: WheelEvent) => {
-      isFitted.value = false
       instance.zoomWithWheel(e)
     }
     viewport.addEventListener('wheel', onWheel)
@@ -50,59 +47,18 @@ export function useFlowPanZoom(viewportRef: Ref<HTMLElement | null>, contentRef:
     }
     panzoom.value?.destroy()
     panzoom.value = null
-    isFitted.value = false
   }
 
   function zoomIn(): void {
-    isFitted.value = false
     panzoom.value?.zoomIn()
   }
 
   function zoomOut(): void {
-    isFitted.value = false
     panzoom.value?.zoomOut()
   }
 
   function reset(): void {
-    isFitted.value = false
     panzoom.value?.reset()
-  }
-
-  function fitToView(): void {
-    if (isFitted.value) return
-
-    const viewport = viewportRef.value
-    const content = contentRef.value
-    const instance = panzoom.value
-    if (!viewport || !content || !instance) return
-
-    const svg = content.querySelector('svg')
-    if (!svg) {
-      instance.reset()
-      return
-    }
-
-    // Reset to the true Panzoom origin so getBoundingClientRect reflects 1× size
-    instance.reset({ animate: false })
-
-    const vp = viewport.getBoundingClientRect()
-    const baseBox = svg.getBoundingClientRect()
-    if (baseBox.width === 0 || baseBox.height === 0) return
-
-    const padding = 40
-    const scaleX = (vp.width - padding * 2) / baseBox.width
-    const scaleY = (vp.height - padding * 2) / baseBox.height
-    // No artificial upper cap — allow scaling up small charts to fill the viewport
-    const scale = Math.min(scaleX, scaleY)
-
-    // Apply the computed scale, then measure the new rendered position and centre
-    instance.zoom(scale, { animate: false })
-    const scaledBox = svg.getBoundingClientRect()
-    const dx = vp.left + vp.width / 2 - (scaledBox.left + scaledBox.width / 2)
-    const dy = vp.top + vp.height / 2 - (scaledBox.top + scaledBox.height / 2)
-    instance.pan(dx, dy, { relative: true })
-
-    isFitted.value = true
   }
 
   function centerView(): void {
@@ -138,5 +94,5 @@ export function useFlowPanZoom(viewportRef: Ref<HTMLElement | null>, contentRef:
 
   onUnmounted(unbind)
 
-  return { bind, unbind, zoomIn, zoomOut, reset, fitToView, centerView, isFitted }
+  return { bind, unbind, zoomIn, zoomOut, reset, centerView }
 }
