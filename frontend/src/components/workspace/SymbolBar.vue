@@ -29,7 +29,7 @@ const total = computed(() => props.totalPages ?? 1)
 
 /** Up to 5 page numbers centred around current page. */
 const pageWindow = computed<number[]>(() => {
-  if (total.value <= 1) return []
+  if (total.value <= 0) return []
   const WINDOW = 5
   const half = Math.floor(WINDOW / 2)
   let start = Math.max(0, page.value - half)
@@ -83,8 +83,8 @@ function onInputBlur(): void {
       <span v-if="!symbolNames?.length" class="text-xs text-slate-500">No symbols on this page</span>
     </div>
 
-    <!-- Pagination control — only shown when there is more than one page -->
-    <div v-if="total > 1" class="flex shrink-0 items-center gap-0.5 rounded-lg border border-slate-700 bg-slate-900 px-1 py-0.5">
+    <!-- Pagination control -->
+    <div v-if="filePath" class="flex shrink-0 items-center gap-0.5 rounded-lg border border-slate-700 bg-slate-900 px-1 py-0.5">
       <!-- Prev arrow -->
       <button
         type="button"
