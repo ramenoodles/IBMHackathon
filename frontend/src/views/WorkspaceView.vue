@@ -19,7 +19,7 @@ import { useFlowGraph } from '@/composables/useFlowGraph'
 import { useSymbolBrief } from '@/composables/useSymbolBrief'
 import { useFileFlowWarm } from '@/composables/useFileFlowWarm'
 import { useNodeDetail } from '@/composables/useNodeDetail'
-import { userContext, normalizeLanguage } from '@/store/userContext'
+import { userContext, normalizeLanguage, clearUserContext } from '@/store/userContext'
 import type { FlowNode } from '@/types/flowGraph'
 
 type WorkspacePhase = 'idle' | 'tracing'
@@ -90,6 +90,11 @@ const branchNode = ref<FlowNode | null>(null)
 
 const router = useRouter()
 const leaveConfirmOpen = ref(false)
+
+function openNewWorkspace(): void {
+  clearUserContext()
+  router.push('/onboarding')
+}
 
 const showSymbolBar = computed(
   () => !!(selectedPath.value && workspacePhase.value === 'tracing'),
@@ -235,6 +240,15 @@ function fileName(): string {
       <span v-if="selectedPath" class="truncate text-xs text-slate-500">
         {{ fileName() }}
       </span>
+      <div class="ml-auto">
+        <button
+          type="button"
+          class="inline-flex items-center rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-onbober-primary hover:text-white"
+          @click="openNewWorkspace"
+        >
+          New workspace
+        </button>
+      </div>
     </header>
 
     <div class="flex min-h-0 flex-1">
