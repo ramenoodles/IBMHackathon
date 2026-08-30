@@ -20,6 +20,7 @@ import {
 } from '@/utils/flowGraphUtils'
 import type { useFlowGraphCache } from '@/composables/useFlowGraphCache'
 import { api } from '@/api'
+import { isCompactNode } from '@/utils/flowGraphLabels'
 
 /**
  * Manages scan-first flow graph with cache, progressive reveal, and async LLM labels.
@@ -260,6 +261,11 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     return allNodes.value.filter((n) => n.collapsed && n.expandable)
   }
 
+  /** Collapsed nodes that full-flow should inline-expand (skip compact callee folds). */
+  function inlineExpandableNodes(): FlowNode[] {
+    return collapsedExpandableNodes().filter((n) => !isCompactNode(n))
+  }
+
   async function fetchExpandFragment(
     nodeId: string,
     payload: Omit<GraphExpandPayload, 'nodeId' | 'parentPath' | 'expandLimit'>,
@@ -310,7 +316,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
         guard++
         revealAllKnownNodes()
 
-        const collapsed = collapsedExpandableNodes()
+        const collapsed = inlineExpandableNodes()
         if (collapsed.length === 0) break
 
         let expandedAny = false
@@ -326,7 +332,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
           mergeFragment(fragment, true)
           expandedCount += 1
           expandedAny = true
-          const remaining = collapsedExpandableNodes().length
+          const remaining = inlineExpandableNodes().length
           setMappingProgress(expandedCount, expandedCount + remaining, 0, 1)
         }
         if (!expandedAny) break
@@ -343,8 +349,8 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
         setMappingProgress(expandGoal, expandGoal, Math.min(enrichGoal, i + batch.length), enrichGoal)
       }
 
-      fullyExpanded.value = collapsedExpandableNodes().length === 0
-      if (!fullyExpanded.value) {
+      fullyExpanded.value = inlineExpandableNodes().length === 0
+      if (!fullyExpanded.value && inlineExpandableNodes().length > 0) {
         error.value = 'Some flow branches could not be expanded'
       }
       persistToCache()

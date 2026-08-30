@@ -34,6 +34,11 @@ import {
   EXPERIENCE_EFFECT_SUMMARY,
   EXPERIENCE_LEVELS,
 } from '@/constants/experienceLevel'
+import {
+  PROGRAMMING_LANGUAGES,
+  languageLabelsFromStored,
+  storedLanguagesFromLabels,
+} from '@/constants/programmingLanguages'
 
 const router = useRouter()
 const { loading, error, setupLocal, setupGitHub, setupDemo, setupZip } = useWorkspaceSetup()
@@ -41,55 +46,14 @@ const { loading, error, setupLocal, setupGitHub, setupDemo, setupZip } = useWork
 const step = ref(1)
 const totalSteps = 3
 
-/**
- * All language options. `value` must match a backend language profile name or
- * alias (auto, c, cpp, csharp, go, java, javascript, python, rust, typescript).
- * Use "auto" for anything not in the list so the backend searches all files.
- */
-const ALL_LANGUAGES: { label: string; value: string }[] = [
-  { label: 'Python',      value: 'python' },
-  { label: 'JavaScript',  value: 'javascript' },
-  { label: 'TypeScript',  value: 'typescript' },
-  { label: 'Go',          value: 'go' },
-  { label: 'Rust',        value: 'rust' },
-  { label: 'Java',        value: 'java' },
-  { label: 'C',           value: 'c' },
-  { label: 'C++',         value: 'cpp' },
-  { label: 'C#',          value: 'csharp' },
-  { label: 'Ruby',        value: 'auto' },
-  { label: 'PHP',         value: 'auto' },
-  { label: 'Swift',       value: 'auto' },
-  { label: 'Kotlin',      value: 'auto' },
-  { label: 'Scala',       value: 'auto' },
-  { label: 'Haskell',     value: 'auto' },
-  { label: 'Lua',         value: 'auto' },
-  { label: 'Elixir',      value: 'auto' },
-  { label: 'Clojure',     value: 'auto' },
-  { label: 'Dart',        value: 'auto' },
-  { label: 'R',           value: 'auto' },
-  { label: 'MATLAB',      value: 'auto' },
-  { label: 'Shell/Bash',  value: 'auto' },
-  { label: 'Other',       value: 'auto' },
-]
-
 const langSearch = ref('')
 const filteredLanguages = computed(() => {
   const q = langSearch.value.toLowerCase().trim()
-  if (!q) return ALL_LANGUAGES
-  return ALL_LANGUAGES.filter((l) => l.label.toLowerCase().includes(q))
+  if (!q) return PROGRAMMING_LANGUAGES
+  return PROGRAMMING_LANGUAGES.filter((l) => l.label.toLowerCase().includes(q))
 })
 
-// Restore from stored comma-separated labels, matching both stored value and label.
-const storedLang = userContext.value.primaryLanguage || ''
-const selectedLangLabels = ref<Set<string>>(
-  new Set(
-    storedLang
-      .split(',')
-      .map((s) => s.trim())
-      .map((s) => ALL_LANGUAGES.find((l) => l.value === s || l.label === s)?.label ?? '')
-      .filter(Boolean),
-  ),
-)
+const selectedLangLabels = ref<Set<string>>(new Set(languageLabelsFromStored(userContext.value.primaryLanguage || '')))
 
 function toggleLang(label: string): void {
   if (selectedLangLabels.value.has(label)) {
@@ -101,14 +65,7 @@ function toggleLang(label: string): void {
   selectedLangLabels.value = new Set(selectedLangLabels.value)
 }
 
-// The value stored in userContext: comma-separated backend-safe values, deduplicated.
-// First non-auto value wins for the explain endpoint; auto is the fallback.
-const selectedLanguagesValue = computed(() => {
-  const values = [...selectedLangLabels.value]
-    .map((label) => ALL_LANGUAGES.find((l) => l.label === label)?.value ?? 'auto')
-  const unique = [...new Set(values)]
-  return unique.join(',')
-})
+const selectedLanguagesValue = computed(() => storedLanguagesFromLabels(selectedLangLabels.value))
 const selectedLevel = ref<ExperienceLevel>(userContext.value.experienceLevel || 'junior')
 
 const sourceTab = ref<WorkspaceSource>('demo')

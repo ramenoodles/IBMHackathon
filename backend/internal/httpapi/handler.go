@@ -316,12 +316,14 @@ func (h *Handler) explain(w http.ResponseWriter, r *http.Request) {
 		Question   string `json:"question"`
 		Language   string `json:"language"`
 		// Node context — enriches the prompt and lets us skip ripgrep when code is present.
-		File       string `json:"file"`
-		Line       int    `json:"line"`
-		Code       string `json:"code"`
-		Kind       string `json:"kind"`
-		Title      string `json:"title"`
-		Experience string `json:"experience"`
+		File                string `json:"file"`
+		Line                int    `json:"line"`
+		Code                string `json:"code"`
+		Kind                string `json:"kind"`
+		Title               string `json:"title"`
+		Experience          string `json:"experience"`
+		FamiliarLanguages   string `json:"familiarLanguages"`
+		LanguageComparisons bool   `json:"languageComparisons"`
 	}
 	if json.NewDecoder(r.Body).Decode(&in) != nil {
 		fail(w, 400, "invalid JSON")
@@ -338,15 +340,17 @@ func (h *Handler) explain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, e := s.Explain(r.Context(), service.ExplainRequest{
-		Name:       in.Name,
-		Question:   in.Question,
-		Language:   in.Language,
-		File:       in.File,
-		Line:       in.Line,
-		Code:       in.Code,
-		Kind:       in.Kind,
-		Title:      in.Title,
-		Experience: in.Experience,
+		Name:                in.Name,
+		Question:            in.Question,
+		Language:            in.Language,
+		File:                in.File,
+		Line:                in.Line,
+		Code:                in.Code,
+		Kind:                in.Kind,
+		Title:               in.Title,
+		Experience:          in.Experience,
+		FamiliarLanguages:   in.FamiliarLanguages,
+		LanguageComparisons: in.LanguageComparisons,
 	})
 	if e != nil {
 		fail(w, 500, e.Error())

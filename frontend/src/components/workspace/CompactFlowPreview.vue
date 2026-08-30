@@ -50,9 +50,9 @@ async function loadPreview(): Promise<void> {
     })
     nodes.value = graph.nodes
     edges.value = graph.edges
-    const byId = new Map(nodes.value.map((n) => [n.id, n]))
+    const nodeCopies = nodes.value.map((n) => ({ ...n }))
     void enrichSymbolNodes(
-      nodes.value,
+      nodeCopies,
       {
         workspaceId: props.workspaceId,
         filePath: props.filePath,
@@ -61,6 +61,7 @@ async function loadPreview(): Promise<void> {
       },
       graph.nodes.map((n) => n.id),
     ).then((result) => {
+      const byId = new Map(nodeCopies.map((n) => [n.id, n]))
       for (const patch of result.patches) {
         const node = byId.get(patch.id)
         if (!node) continue
@@ -73,7 +74,7 @@ async function loadPreview(): Promise<void> {
           }
         }
       }
-      nodes.value = [...nodes.value]
+      nodes.value = nodeCopies
     })
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load compacted flow'

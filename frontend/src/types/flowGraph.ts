@@ -90,6 +90,7 @@ export interface GraphRootPayload {
     primaryLanguage: string
     experienceLevel: string
     workspaceId: string
+    languageComparisons?: boolean
   }
 }
 

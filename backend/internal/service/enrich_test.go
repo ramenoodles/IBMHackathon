@@ -52,6 +52,23 @@ func TestContextualHeuristicReturn(t *testing.T) {
 	}
 }
 
+func TestBuildEnrichPromptLanguageComparisons(t *testing.T) {
+	prompt := buildEnrichPrompt(EnrichRequest{
+		Symbol: "close",
+		UserContext: EnrichUserContext{
+			ExperienceLevel:     "mid",
+			PrimaryLanguage:     "python,go",
+			LanguageComparisons: true,
+		},
+	}, []EnrichNodeInput{{ID: "a", Code: "m.mu.Lock()", Kind: "call"}})
+	if !contains(prompt, "Familiar languages: python,go") {
+		t.Fatalf("prompt missing familiar languages: %q", prompt)
+	}
+	if !contains(prompt, "brief comparison phrase") {
+		t.Fatalf("prompt missing comparison guidance: %q", prompt)
+	}
+}
+
 func TestBuildEnrichPromptMidAudience(t *testing.T) {
 	prompt := buildEnrichPrompt(EnrichRequest{
 		Symbol: "close",

@@ -5,6 +5,8 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ExperienceLevelToggle from '@/components/workspace/ExperienceLevelToggle.vue'
+import LanguageComparisonsToggle from '@/components/workspace/LanguageComparisonsToggle.vue'
+import FamiliarLanguagesMenu from '@/components/workspace/FamiliarLanguagesMenu.vue'
 import Sidebar from '@/components/workspace/Sidebar.vue'
 import SymbolBar from '@/components/workspace/SymbolBar.vue'
 import FlowCanvas from '@/components/workspace/FlowCanvas.vue'
@@ -21,7 +23,7 @@ import { useFlowGraph } from '@/composables/useFlowGraph'
 import { useSymbolBrief } from '@/composables/useSymbolBrief'
 import { useFileFlowWarm } from '@/composables/useFileFlowWarm'
 import { useNodeDetail } from '@/composables/useNodeDetail'
-import { userContext, normalizeLanguage, clearUserContext, updateUserContext, type ExperienceLevel } from '@/store/userContext'
+import { userContext, normalizeLanguage, familiarLanguageNames, clearUserContext, updateUserContext, type ExperienceLevel } from '@/store/userContext'
 import type { FlowNode } from '@/types/flowGraph'
 
 type WorkspacePhase = 'idle' | 'tracing'
@@ -107,7 +109,12 @@ const experienceLevel = computed({
   set: (level: ExperienceLevel) => updateUserContext({ experienceLevel: level }),
 })
 
-async function onExperienceChange(_level: ExperienceLevel): Promise<void> {
+const languageComparisons = computed({
+  get: () => userContext.value.languageComparisons,
+  set: (enabled: boolean) => updateUserContext({ languageComparisons: enabled }),
+})
+
+async function refreshAiContent(): Promise<void> {
   clearDetailCache()
   const hadDetail = Boolean(detail.value?.explanation?.trim())
   clearDetail()
@@ -118,6 +125,19 @@ async function onExperienceChange(_level: ExperienceLevel): Promise<void> {
       if (node) onRequestDetail(node)
     }
   }
+}
+
+async function onExperienceChange(_level: ExperienceLevel): Promise<void> {
+  await refreshAiContent()
+}
+
+async function onLanguageComparisonsChange(_enabled: boolean): Promise<void> {
+  await refreshAiContent()
+}
+
+async function onFamiliarLanguagesChange(stored: string): Promise<void> {
+  updateUserContext({ primaryLanguage: stored })
+  await refreshAiContent()
 }
 
 const showSymbolBar = computed(
@@ -190,6 +210,8 @@ function onRequestDetail(node: FlowNode): void {
       summary: node.summary,
       experience: userContext.value.experienceLevel,
       language: normalizeLanguage(userContext.value.primaryLanguage),
+      languageComparisons: userContext.value.languageComparisons,
+      familiarLanguages: familiarLanguageNames(userContext.value.primaryLanguage).join(', '),
     },
     { stream: true },
   )
@@ -270,6 +292,15 @@ function fileName(): string {
         {{ fileName() }}
       </span>
       <div class="ml-auto flex items-center gap-2">
+        <FamiliarLanguagesMenu
+          :primary-language="userContext.primaryLanguage"
+          @change="onFamiliarLanguagesChange"
+        />
+        <LanguageComparisonsToggle
+          v-model="languageComparisons"
+          :primary-language="userContext.primaryLanguage"
+          @change="onLanguageComparisonsChange"
+        />
         <ExperienceLevelToggle v-model="experienceLevel" @change="onExperienceChange" />
         <button
           type="button"

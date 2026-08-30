@@ -112,6 +112,8 @@ export const api = {
     kind?: string
     title?: string
     experience?: string
+    languageComparisons?: boolean
+    familiarLanguages?: string
   }, signal?: AbortSignal): Promise<NodeDetail> {
     return request<NodeDetail>(workspacePath(workspaceId, 'explain'), { ...jsonBody(body), signal })
   },
@@ -136,6 +138,8 @@ export const api = {
     kind?: string
     title?: string
     experience?: string
+    languageComparisons?: boolean
+    familiarLanguages?: string
   }, signal?: AbortSignal): Promise<Response> {
     const response = await fetch(workspacePath(workspaceId, 'explain'), { ...jsonBody(body), signal })
     if (!response.ok) {

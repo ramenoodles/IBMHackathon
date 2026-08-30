@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hasEnrichedLabel, isCompactNode, labelSourceBadge, labelSourcePill } from '@/utils/flowGraphLabels'
+import { hasEnrichedLabel, isCompactNode, canPreviewCalleeFlow, labelSourceBadge, labelSourcePill } from '@/utils/flowGraphLabels'
 import type { FlowNode } from '@/types/flowGraph'
 
 const baseNode = (overrides: Partial<FlowNode> = {}): FlowNode => ({
@@ -24,7 +24,7 @@ describe('flowGraphLabels', () => {
 
   it('returns badges for details panel', () => {
     expect(labelSourceBadge('heuristic')).toBe('Auto label')
-    expect(labelSourceBadge('ai')).toBe('AI label')
+    expect(labelSourceBadge('ai')).toBe('Brief')
     expect(labelSourceBadge(undefined)).toBeNull()
   })
 
@@ -55,5 +55,17 @@ describe('flowGraphLabels', () => {
         }),
       ),
     ).toBe(false)
+  })
+
+  it('detects callee preview regardless of collapsed state', () => {
+    const compact = baseNode({
+      collapsed: true,
+      expandable: true,
+      calleeFile: 'foo.go',
+      calleeSymbol: 'close',
+    })
+    expect(canPreviewCalleeFlow(compact)).toBe(true)
+    expect(canPreviewCalleeFlow({ ...compact, collapsed: false, expandable: false })).toBe(true)
+    expect(canPreviewCalleeFlow(baseNode())).toBe(false)
   })
 })

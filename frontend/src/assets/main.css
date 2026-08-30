@@ -19,6 +19,10 @@
   50%       { opacity: 0.2; }
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 html,
 body,
 #app {
