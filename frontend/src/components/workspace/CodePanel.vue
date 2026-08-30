@@ -1,17 +1,21 @@
 <script setup lang="ts">
 /**
- * Minimal code viewer for the source modal — no duplicate symbol chips.
+ * Code viewer using Monaco Editor — syntax highlighting, line numbers,
+ * and optional jump-to / highlight of a specific line.
  */
-import { highlightCode, languageFromPath } from '@/composables/useShiki'
+import { languageFromPath } from '@/composables/useShiki'
 import { api } from '@/api'
 import { onMounted, ref, watch } from 'vue'
+import MonacoEditor from './MonacoEditor.vue'
 
 const props = defineProps<{
   workspaceId: string
   filePath: string
+  highlightLine?: number
 }>()
 
-const highlightedHtml = ref('')
+const content = ref('')
+const language = ref('text')
 const loading = ref(false)
 
 async function loadFile(): Promise<void> {
@@ -19,7 +23,8 @@ async function loadFile(): Promise<void> {
   loading.value = true
   try {
     const data = await api.file(props.workspaceId, props.filePath)
-    highlightedHtml.value = await highlightCode(data.content, data.language || languageFromPath(props.filePath))
+    content.value = data.content
+    language.value = data.language || languageFromPath(props.filePath)
   } finally {
     loading.value = false
   }
@@ -30,16 +35,16 @@ watch(() => props.filePath, loadFile)
 </script>
 
 <template>
-  <div class="text-sm">
-    <p v-if="loading" class="text-slate-500">Loading...</p>
-    <div v-else class="shiki-container overflow-x-auto" v-html="highlightedHtml" />
+  <div class="flex h-full flex-col">
+    <p v-if="loading" class="flex flex-1 items-center justify-center text-sm text-slate-500">
+      Loading...
+    </p>
+    <MonacoEditor
+      v-else
+      :content="content"
+      :language="language"
+      :highlight-line="highlightLine"
+      class="flex-1"
+    />
   </div>
 </template>
-
-<style scoped>
-.shiki-container :deep(pre) {
-  margin: 0;
-  padding: 0;
-  background: transparent !important;
-}
-</style>

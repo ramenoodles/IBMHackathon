@@ -23,7 +23,7 @@ export function extractFunctions(source: string, filePath: string): string[] {
   } else if (ext === 'rs') {
     patterns.push(/^\s*(?:pub\s+)?fn\s+([A-Za-z_]\w*)/gm)
   } else {
-    patterns.push(/^\s*(?:static\s+|inline\s+)?[\w\s\*]+\s+([A-Za-z_]\w*)\s*\(/gm)
+    patterns.push(/^\s*(?:static\s+|inline\s+)?[\w\s*]+\s+([A-Za-z_]\w*)\s*\(/gm)
     patterns.push(/^\s*class\s+([A-Za-z_]\w*)/gm)
   }
 

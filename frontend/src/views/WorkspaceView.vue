@@ -92,6 +92,7 @@ const symbol = ref('')
 const selectedNodeId = ref('')
 const sourceOpen = ref(false)
 const sourcePath = ref('')
+const sourceLine = ref<number | undefined>(undefined)
 const branchPromptOpen = ref(false)
 const branchNode = ref<FlowNode | null>(null)
 
@@ -174,13 +175,15 @@ function onRequestDetail(node: FlowNode): void {
   )
 }
 
-function onViewSource(file?: string): void {
+function onViewSource(file?: string, line?: number): void {
   sourcePath.value = file ?? selectedPath.value
+  sourceLine.value = line
   sourceOpen.value = true
 }
 
-function onGoToDefinition(file: string, _line: number): void {
+function onGoToDefinition(file: string, line: number): void {
   sourcePath.value = file
+  sourceLine.value = line || undefined
   sourceOpen.value = true
 }
 
@@ -303,7 +306,7 @@ function fileName(): string {
             @reveal-node="onRevealNode"
             @expand-node="onExpandNode"
             @show-full-flow="onShowFullFlow"
-            @view-source="onViewSource()"
+            @view-source="onViewSource"
             @go-to-definition="onGoToDefinition"
           />
 
@@ -339,14 +342,13 @@ function fileName(): string {
       </div>
     </Modal>
 
-    <Modal :open="sourceOpen" title="Source" @close="sourceOpen = false">
-      <div class="max-h-[60vh] overflow-auto">
-        <CodePanel
-          v-if="sourcePath || selectedPath"
-          :workspace-id="userContext.workspaceId"
-          :file-path="sourcePath || selectedPath"
-        />
-      </div>
+    <Modal :open="sourceOpen" title="Source" size="xl" @close="sourceOpen = false">
+      <CodePanel
+        v-if="sourcePath || selectedPath"
+        :workspace-id="userContext.workspaceId"
+        :file-path="sourcePath || selectedPath"
+        :highlight-line="sourceLine"
+      />
     </Modal>
 
     <BranchPrompt

@@ -27,20 +27,16 @@ const MERMAID_RESERVED = new Set([
 const STRUCTURAL_RENDER_DEBOUNCE_MS = 75
 
 /**
- * Escape text for Mermaid quoted node labels.
+ * Escape text for Mermaid quoted node labels ("...").
+ * Inside a double-quoted label the only characters that break parsing are
+ * double-quotes (which close the string) and raw newlines.
+ * Everything else — <, >, [, ], #, ; — is safe to pass through as-is.
  * @param text - Raw label text.
  */
 export function escapeMermaidLabel(text: string): string {
   return text
-    .replace(/\r?\n/g, ' ')
-    .replace(/\\/g, '\\\\')
-    .replace(/#/g, '#35;')
-    .replace(/"/g, '#quot;')
-    .replace(/\[/g, '#91;')
-    .replace(/\]/g, '#93;')
-    .replace(/</g, '#lt;')
-    .replace(/>/g, '#gt;')
-    .replace(/;/g, '#59;')
+    .replace(/\r?\n/g, ' ')    // collapse newlines to a space
+    .replace(/"/g, "'")         // swap " for ' to avoid closing the label string
 }
 
 /**

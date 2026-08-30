@@ -10,9 +10,16 @@ const props = withDefaults(
     open: boolean
     /** Optional title shown in the modal header. */
     title?: string
+    /**
+     * Dialog width preset.
+     * - "md"  (default) — max-w-lg  — general dialogs
+     * - "xl"            — 90vw × 85vh — code viewer
+     */
+    size?: 'md' | 'xl'
   }>(),
   {
     title: '',
+    size: 'md',
   },
 )
 
@@ -44,12 +51,22 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
         @click.self="emit('close')"
       >
         <div
-          class="modal-dialog w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+          class="modal-dialog rounded-xl border border-slate-700 bg-slate-900 shadow-2xl"
+          :class="
+            size === 'xl'
+              ? 'flex w-[90vw] max-w-[90vw] flex-col p-0'
+              : 'w-full max-w-lg p-6'
+          "
+          :style="size === 'xl' ? 'height: 85vh' : ''"
           role="dialog"
           aria-modal="true"
         >
-          <header v-if="title" class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-100">{{ title }}</h2>
+          <header
+            v-if="title"
+            class="flex shrink-0 items-center justify-between border-b border-slate-800 px-5 py-3"
+            :class="size === 'xl' ? '' : 'mb-4 border-none px-0 py-0'"
+          >
+            <h2 class="text-base font-semibold text-slate-100">{{ title }}</h2>
             <button
               type="button"
               class="text-slate-400 hover:text-white"
@@ -61,7 +78,9 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
               </svg>
             </button>
           </header>
-          <slot />
+          <div :class="size === 'xl' ? 'min-h-0 flex-1' : ''">
+            <slot />
+          </div>
         </div>
       </div>
     </Transition>
