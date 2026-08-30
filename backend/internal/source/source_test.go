@@ -55,6 +55,20 @@ func TestReaderReadFileAndContext(t *testing.T) {
 	}
 }
 
+func TestReaderRejectsOversizedFile(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "big.go"), make([]byte, 512), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reader, err := NewReaderWithLimit(root, 256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reader.ReadFile("big.go"); err == nil || !strings.Contains(err.Error(), "exceeds max size") {
+		t.Fatalf("ReadFile(big.go) error = %v, want oversized error", err)
+	}
+}
+
 func TestReaderRejectsUnsafeAndInvalidContext(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "sample.go"), []byte("one\ntwo"), 0o600); err != nil {

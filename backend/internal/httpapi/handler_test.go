@@ -30,7 +30,7 @@ def parent():
 		t.Fatal(err)
 	}
 
-	manager, err := workspace.NewManager()
+	manager, err := workspace.NewManager(workspace.Limits{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ def parent():
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler := New(manager, "rg", "", "", "", false).Handler()
+	handler := New(manager, Options{RGBinary: "rg"}).Handler()
 
 	rootResponse := performJSON(t, handler, http.MethodPost, "/api/workspaces/"+ws.ID+"/graphs", map[string]any{
 		"filePath": "flow.py",
@@ -86,7 +86,7 @@ def parent():
 }
 
 func TestGraphRootRequiresFilePath(t *testing.T) {
-	manager, err := workspace.NewManager()
+	manager, err := workspace.NewManager(workspace.Limits{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestGraphRootRequiresFilePath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	response := performJSON(t, New(manager, "rg", "", "", "", false).Handler(), http.MethodPost, "/api/workspaces/"+ws.ID+"/graphs", map[string]any{
+	response := performJSON(t, New(manager, Options{RGBinary: "rg"}).Handler(), http.MethodPost, "/api/workspaces/"+ws.ID+"/graphs", map[string]any{
 		"symbol": "missingFile",
 	})
 	if response.Code != http.StatusBadRequest {

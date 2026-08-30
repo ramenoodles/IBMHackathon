@@ -17,6 +17,12 @@ type WatsonxClient struct {
 }
 
 func NewWatsonxClient(model, root, rgBinary, apiKey, projectID string) (*WatsonxClient, error) {
+	return NewWatsonxClientWithLimit(model, root, rgBinary, apiKey, projectID, source.DefaultMaxFileBytes)
+}
+
+// NewWatsonxClientWithLimit is NewWatsonxClient with an explicit per-file size
+// cap passed to the source reader used for agent tooling.
+func NewWatsonxClientWithLimit(model, root, rgBinary, apiKey, projectID string, maxFileBytes int64) (*WatsonxClient, error) {
 	client, err := wx.NewClient(
 		wx.WithWatsonxAPIKey(apiKey),
 		wx.WithWatsonxProjectID(projectID),
@@ -25,7 +31,7 @@ func NewWatsonxClient(model, root, rgBinary, apiKey, projectID string) (*Watsonx
 		return nil, fmt.Errorf("create watsonx client: %w", err)
 	}
 
-	reader, err := source.NewReader(root)
+	reader, err := source.NewReaderWithLimit(root, maxFileBytes)
 	if err != nil {
 		return nil, fmt.Errorf("create source reader: %w", err)
 	}

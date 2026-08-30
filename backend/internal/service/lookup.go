@@ -42,7 +42,18 @@ func New(
 	client llmclient.Client,
 	includeTrajectory bool,
 ) (*Service, error) {
-	reader, err := source.NewReader(root)
+	return NewWithLimit(root, rgBinary, client, includeTrajectory, source.DefaultMaxFileBytes)
+}
+
+// NewWithLimit is New with an explicit per-file size cap passed to the reader.
+func NewWithLimit(
+	root string,
+	rgBinary string,
+	client llmclient.Client,
+	includeTrajectory bool,
+	maxFileBytes int64,
+) (*Service, error) {
+	reader, err := source.NewReaderWithLimit(root, maxFileBytes)
 	if err != nil {
 		return nil, err
 	}

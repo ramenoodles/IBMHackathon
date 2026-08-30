@@ -50,18 +50,9 @@ async function loadPreview(): Promise<void> {
     })
     nodes.value = graph.nodes
     edges.value = graph.edges
-    const state = {
-      allNodes: nodes.value.map((n) => ({ ...n })),
-      allEdges: [...edges.value],
-      rootId: graph.rootId,
-      revealedIds: new Set(graph.nodes.map((n) => n.id)),
-      enrichedIds: new Set<string>(),
-      isMock: Boolean(graph.mock),
-      parentPath: [],
-      fullyExpanded: false,
-    }
+    const byId = new Map(nodes.value.map((n) => [n.id, n]))
     void enrichSymbolNodes(
-      state,
+      nodes.value,
       {
         workspaceId: props.workspaceId,
         filePath: props.filePath,
@@ -69,8 +60,20 @@ async function loadPreview(): Promise<void> {
         userContext: props.userContext,
       },
       graph.nodes.map((n) => n.id),
-    ).then(() => {
-      nodes.value = state.allNodes
+    ).then((result) => {
+      for (const patch of result.patches) {
+        const node = byId.get(patch.id)
+        if (!node) continue
+        if (patch.title) node.title = patch.title
+        if (patch.summary) node.summary = patch.summary
+        if (patch.labelSource) {
+          node.labelSource = patch.labelSource as FlowNode['labelSource']
+          if (patch.labelSource === 'ai' || patch.labelSource === 'heuristic') {
+            node.confidence = 'inferred'
+          }
+        }
+      }
+      nodes.value = [...nodes.value]
     })
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load compacted flow'

@@ -56,7 +56,12 @@ type Builder struct {
 }
 
 func New(root, rg string) (*Builder, error) {
-	reader, err := source.NewReader(root)
+	return NewWithLimit(root, rg, source.DefaultMaxFileBytes)
+}
+
+// NewWithLimit is New with an explicit per-file size cap passed to the reader.
+func NewWithLimit(root, rg string, maxFileBytes int64) (*Builder, error) {
+	reader, err := source.NewReaderWithLimit(root, maxFileBytes)
 	if err != nil {
 		return nil, err
 	}

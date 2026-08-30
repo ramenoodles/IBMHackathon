@@ -3,16 +3,18 @@ package httpapi
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ramenoodles/IBMHackathon/backend/internal/analysis"
-	"github.com/ramenoodles/IBMHackathon/backend/internal/llm"
-	"github.com/ramenoodles/IBMHackathon/backend/internal/service"
-	"github.com/ramenoodles/IBMHackathon/backend/internal/source"
-	"github.com/ramenoodles/IBMHackathon/backend/internal/workspace"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/ramenoodles/IBMHackathon/backend/internal/analysis"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/config"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/llm"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/service"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/source"
+	"github.com/ramenoodles/IBMHackathon/backend/internal/workspace"
 )
 
 type Handler struct {
@@ -22,16 +24,37 @@ type Handler struct {
 	WatsonxAPIKey     string
 	WatsonxProjectID  string
 	WatsonxEnabled    bool
+	MaxBodyBytes      int64
+	MaxFileBytes      int64
 }
 
-func New(m *workspace.Manager, rg, model, apiKey, projectID string, enabled bool) *Handler {
+// Options carries the tunables the API derives from server configuration.
+type Options struct {
+	RGBinary         string
+	WatsonxModel     string
+	WatsonxAPIKey    string
+	WatsonxProjectID string
+	WatsonxEnabled   bool
+	MaxBodyBytes     int64
+	MaxFileBytes     int64
+}
+
+func New(m *workspace.Manager, opts Options) *Handler {
+	if opts.MaxBodyBytes <= 0 {
+		opts.MaxBodyBytes = int64(config.DefaultMaxBodyBytes)
+	}
+	if opts.MaxFileBytes <= 0 {
+		opts.MaxFileBytes = int64(source.DefaultMaxFileBytes)
+	}
 	return &Handler{
 		Workspaces:       m,
-		RGBinary:         rg,
-		WatsonxModel:     model,
-		WatsonxAPIKey:    apiKey,
-		WatsonxProjectID: projectID,
-		WatsonxEnabled:   enabled,
+		RGBinary:         opts.RGBinary,
+		WatsonxModel:     opts.WatsonxModel,
+		WatsonxAPIKey:    opts.WatsonxAPIKey,
+		WatsonxProjectID: opts.WatsonxProjectID,
+		WatsonxEnabled:   opts.WatsonxEnabled,
+		MaxBodyBytes:     opts.MaxBodyBytes,
+		MaxFileBytes:     opts.MaxFileBytes,
 	}
 }
 func (h *Handler) Handler() http.Handler {
@@ -59,12 +82,12 @@ func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
 	write(w, 200, map[string]any{"status": "ok", "watsonx": h.WatsonxEnabled})
 }
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 200<<20)
+	r.Body = http.MaxBytesReader(w, r.Body, h.MaxBodyBytes)
 	ct := r.Header.Get("Content-Type")
 	var ws workspace.Workspace
 	var err error
 	if strings.HasPrefix(ct, "multipart/") {
-		if err = r.ParseMultipartForm(200 << 20); err == nil {
+		if err = r.ParseMultipartForm(h.MaxBodyBytes); err == nil {
 			f, head, formErr := r.FormFile("file")
 			if formErr != nil {
 				err = formErr
@@ -146,7 +169,7 @@ func (h *Handler) file(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := r.URL.Query().Get("path")
-	reader, e := source.NewReader(ws.Root)
+	reader, e := source.NewReaderWithLimit(ws.Root, h.MaxFileBytes)
 	if e != nil {
 		fail(w, 500, e.Error())
 		return
@@ -165,7 +188,7 @@ func (h *Handler) symbols(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := r.URL.Query().Get("path")
-	reader, e := source.NewReader(ws.Root)
+	reader, e := source.NewReaderWithLimit(ws.Root, h.MaxFileBytes)
 	if e != nil {
 		fail(w, 500, e.Error())
 		return
@@ -191,7 +214,7 @@ func (h *Handler) graph(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "filePath and symbol are required")
 		return
 	}
-	b, e := analysis.New(ws.Root, h.RGBinary)
+	b, e := analysis.NewWithLimit(ws.Root, h.RGBinary, h.MaxFileBytes)
 	if e != nil {
 		fail(w, 500, e.Error())
 		return
@@ -219,7 +242,7 @@ func (h *Handler) expand(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "nodeId is required")
 		return
 	}
-	b, e := analysis.New(ws.Root, h.RGBinary)
+	b, e := analysis.NewWithLimit(ws.Root, h.RGBinary, h.MaxFileBytes)
 	if e != nil {
 		fail(w, 500, e.Error())
 		return
@@ -253,7 +276,7 @@ func (h *Handler) enrich(w http.ResponseWriter, r *http.Request) {
 
 	var client llm.Client
 	if h.WatsonxEnabled {
-		watsonx, e := llm.NewWatsonxClient(h.WatsonxModel, ws.Root, h.RGBinary, h.WatsonxAPIKey, h.WatsonxProjectID)
+		watsonx, e := llm.NewWatsonxClientWithLimit(h.WatsonxModel, ws.Root, h.RGBinary, h.WatsonxAPIKey, h.WatsonxProjectID, h.MaxFileBytes)
 		if e != nil {
 			fail(w, 500, e.Error())
 			return
@@ -261,7 +284,7 @@ func (h *Handler) enrich(w http.ResponseWriter, r *http.Request) {
 		client = watsonx
 	}
 
-	s, e := service.New(ws.Root, h.RGBinary, client, false)
+	s, e := service.NewWithLimit(ws.Root, h.RGBinary, client, false, h.MaxFileBytes)
 	if e != nil {
 		fail(w, 500, e.Error())
 		return
@@ -304,12 +327,12 @@ func (h *Handler) explain(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "invalid JSON")
 		return
 	}
-	client, e := llm.NewWatsonxClient(h.WatsonxModel, ws.Root, h.RGBinary, h.WatsonxAPIKey, h.WatsonxProjectID)
+	client, e := llm.NewWatsonxClientWithLimit(h.WatsonxModel, ws.Root, h.RGBinary, h.WatsonxAPIKey, h.WatsonxProjectID, h.MaxFileBytes)
 	if e != nil {
 		fail(w, 500, e.Error())
 		return
 	}
-	s, e := service.New(ws.Root, h.RGBinary, client, false)
+	s, e := service.NewWithLimit(ws.Root, h.RGBinary, client, false, h.MaxFileBytes)
 	if e != nil {
 		fail(w, 500, e.Error())
 		return

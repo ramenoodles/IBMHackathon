@@ -22,13 +22,25 @@ func main() {
 	_ = godotenv.Load()
 
 	cfg := config.FromEnvironment()
-	m, e := workspace.NewManager()
+	m, e := workspace.NewManager(workspace.Limits{
+		MaxRepoBytes: cfg.MaxRepoBytes,
+		MaxZipFiles:  cfg.MaxZipFiles,
+		CloneTimeout: cfg.CloneTimeout,
+	})
 	if e != nil {
 		log.Fatal(e)
 	}
 	defer m.Close()
-	h := httpapi.New(m, cfg.RGBinary, cfg.WatsonxModel, cfg.WatsonxAPIKey, cfg.WatsonxProjectID, cfg.WatsonxAPIKey != "" && cfg.WatsonxProjectID != "" && cfg.WatsonxModel != "")
-	srv := &http.Server{Addr: cfg.Host + ":" + cfg.Port, Handler: timeout(h.Handler()), ReadHeaderTimeout: 10 * time.Second, WriteTimeout: 120 * time.Second, IdleTimeout: 60 * time.Second}
+	h := httpapi.New(m, httpapi.Options{
+		RGBinary:         cfg.RGBinary,
+		WatsonxModel:     cfg.WatsonxModel,
+		WatsonxAPIKey:    cfg.WatsonxAPIKey,
+		WatsonxProjectID: cfg.WatsonxProjectID,
+		WatsonxEnabled:   cfg.WatsonxAPIKey != "" && cfg.WatsonxProjectID != "" && cfg.WatsonxModel != "",
+		MaxBodyBytes:     cfg.MaxBodyBytes,
+		MaxFileBytes:     cfg.MaxFileBytes,
+	})
+	srv := &http.Server{Addr: cfg.Host + ":" + cfg.Port, Handler: timeout(h.Handler(), cfg.RequestTimeout), ReadHeaderTimeout: 10 * time.Second, WriteTimeout: cfg.RequestTimeout, IdleTimeout: 60 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go func() {
@@ -42,6 +54,6 @@ func main() {
 		log.Fatal(e)
 	}
 }
-func timeout(next http.Handler) http.Handler {
-	return http.TimeoutHandler(next, 120*time.Second, fmt.Sprintf(`{"error":{"code":"timeout","message":"request timed out"}}`))
+func timeout(next http.Handler, duration time.Duration) http.Handler {
+	return http.TimeoutHandler(next, duration, fmt.Sprintf(`{"error":{"code":"timeout","message":"request timed out"}}`))
 }

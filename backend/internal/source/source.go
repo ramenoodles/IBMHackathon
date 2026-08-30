@@ -14,14 +14,25 @@ type Snippet struct {
 	Content   string
 }
 
+// DefaultMaxFileBytes caps how large a single file the reader will open.
+const DefaultMaxFileBytes = 2 << 20
+
 type Reader struct {
-	root string
+	root         string
+	maxFileBytes int64
 }
 
 func (reader *Reader) Root() string { return reader.root }
 
 // Returns a new reader while doing basic validtion before hand
 func NewReader(root string) (*Reader, error) {
+	return NewReaderWithLimit(root, DefaultMaxFileBytes)
+}
+
+// NewReaderWithLimit is NewReader with an explicit per-file size cap. Files
+// larger than maxFileBytes are rejected in ReadFile before being read into
+// memory.
+func NewReaderWithLimit(root string, maxFileBytes int64) (*Reader, error) {
 	if strings.TrimSpace(root) == "" {
 		root = "."
 	}
@@ -40,8 +51,13 @@ func NewReader(root string) (*Reader, error) {
 		return nil, fmt.Errorf("source root %q is not a directory", root)
 	}
 
+	if maxFileBytes <= 0 {
+		maxFileBytes = DefaultMaxFileBytes
+	}
+
 	return &Reader{
-		root: absoluteRoot,
+		root:         absoluteRoot,
+		maxFileBytes: maxFileBytes,
 	}, nil
 }
 
@@ -49,6 +65,17 @@ func (reader *Reader) ReadFile(relativePath string) (string, error) {
 	path, err := reader.resolve(relativePath)
 	if err != nil {
 		return "", err
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", fmt.Errorf("read source file %q: %w", relativePath, err)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("source path %q is a directory", relativePath)
+	}
+	if info.Size() > reader.maxFileBytes {
+		return "", fmt.Errorf("source file %q exceeds max size (%d bytes)", relativePath, reader.maxFileBytes)
 	}
 
 	data, err := os.ReadFile(path)
