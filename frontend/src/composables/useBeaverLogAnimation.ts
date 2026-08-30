@@ -64,6 +64,7 @@ export function useBeaverLogAnimation(options: UseBeaverLogAnimationOptions) {
   let spawnCounter = 0
   let animStartTime: number | null = null
   let finishing = false
+  let smoothedProgress = 0
 
   function initParticles(): void {
     if (!chipsLayer.value || !shavingsGroup.value) return
@@ -139,6 +140,7 @@ export function useBeaverLogAnimation(options: UseBeaverLogAnimationOptions) {
 
   function resetAnimation(): void {
     progress.value = 0
+    smoothedProgress = 0
     animStartTime = null
     finishing = false
     spawnCounter = 0
@@ -150,7 +152,16 @@ export function useBeaverLogAnimation(options: UseBeaverLogAnimationOptions) {
     const mode = options.mode.value
 
     if (mode === 'progress' && options.externalProgress) {
-      progress.value = Math.min(100, Math.max(0, options.externalProgress.value))
+      const target = Math.min(100, Math.max(0, options.externalProgress.value))
+      const gap = target - smoothedProgress
+      if (Math.abs(gap) < 0.25) {
+        smoothedProgress = target
+      } else {
+        // Ease toward reported progress so sudden jumps feel natural.
+        const ease = Math.min(1, (gap > 0 ? 2.2 : 4) * dt)
+        smoothedProgress += gap * ease
+      }
+      progress.value = smoothedProgress
       return
     }
 
@@ -279,7 +290,10 @@ export function useBeaverLogAnimation(options: UseBeaverLogAnimationOptions) {
         finishing = true
       }
       if (isActive) {
-        if (options.mode.value !== 'progress') {
+        if (options.mode.value === 'progress') {
+          smoothedProgress = 0
+          progress.value = 0
+        } else {
           resetAnimation()
           animStartTime = performance.now()
         }
