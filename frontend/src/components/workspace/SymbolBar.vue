@@ -6,7 +6,7 @@
 import { computed, ref } from 'vue'
 
 const props = defineProps<{
-  workspacePath: string
+  workspaceId: string
   filePath: string
   activeSymbol: string
   symbolNames?: string[]

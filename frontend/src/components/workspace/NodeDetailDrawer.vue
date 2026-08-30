@@ -30,7 +30,7 @@ const emit = defineEmits<{
 
       <template v-if="detail">
         <div v-if="detail.mock" class="mb-3 rounded border border-amber-800/50 bg-amber-900/20 px-2 py-1 text-xs text-amber-300">
-          Demo detail (Ollama offline)
+          Watsonx explanation unavailable
         </div>
         <h2 class="text-lg font-bold text-white">{{ detail.title }}</h2>
         <span

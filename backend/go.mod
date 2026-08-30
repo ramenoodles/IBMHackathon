@@ -1,7 +1,7 @@
-module github.com/ibmhackathon/onbober
+module github.com/ramenoodles/IBMHackathon/backend
 
 go 1.22
 
-require grepwrapper v0.0.0
+require github.com/IBM/watsonx-go v1.0.3-0.20260107144423-54204fc4bd2a
 
-replace grepwrapper => ../grepwrapper
+require github.com/joho/godotenv v1.5.1

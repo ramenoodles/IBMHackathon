@@ -3,10 +3,11 @@
  * Minimal code viewer for the source modal — no duplicate symbol chips.
  */
 import { highlightCode, languageFromPath } from '@/composables/useShiki'
+import { api } from '@/api'
 import { onMounted, ref, watch } from 'vue'
 
 const props = defineProps<{
-  workspacePath: string
+  workspaceId: string
   filePath: string
 }>()
 
@@ -14,13 +15,10 @@ const highlightedHtml = ref('')
 const loading = ref(false)
 
 async function loadFile(): Promise<void> {
-  if (!props.workspacePath || !props.filePath) return
+  if (!props.workspaceId || !props.filePath) return
   loading.value = true
   try {
-    const params = new URLSearchParams({ workspace: props.workspacePath, path: props.filePath })
-    const res = await fetch(`/api/file?${params}`)
-    if (!res.ok) return
-    const data = (await res.json()) as { content: string; language: string }
+    const data = await api.file(props.workspaceId, props.filePath)
     highlightedHtml.value = await highlightCode(data.content, data.language || languageFromPath(props.filePath))
   } finally {
     loading.value = false

@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
+import { api } from '@/api'
 import type { FileSymbol } from '@/utils/flowGraphUtils'
-import { SYMBOL_PAGE_SIZE } from '@/utils/flowGraphUtils'
+import { LARGE_FILE_SYMBOL_THRESHOLD, SYMBOL_PAGE_SIZE } from '@/utils/flowGraphUtils'
 
 /**
  * Fetches structured symbols for a file and paginates them client-side.
@@ -11,6 +12,7 @@ export function useSymbolBrief() {
   const currentPage = ref(0)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const isLargeFile = ref(false)
 
   const totalPages = computed(() => Math.max(1, Math.ceil(allSymbols.value.length / SYMBOL_PAGE_SIZE)))
 
@@ -35,25 +37,25 @@ export function useSymbolBrief() {
     currentPage.value = clamped
   }
 
-  async function load(workspacePath: string, filePath: string): Promise<void> {
-    if (!workspacePath || !filePath) {
+  async function load(workspaceId: string, filePath: string): Promise<void> {
+    if (!workspaceId || !filePath) {
       allSymbols.value = []
       currentPage.value = 0
+      isLargeFile.value = false
       return
     }
     loading.value = true
     error.value = null
     try {
-      const params = new URLSearchParams({ workspace: workspacePath, path: filePath })
-      const res = await fetch(`/api/file/symbols?${params}`)
-      if (!res.ok) throw new Error(`Symbol scan failed (${res.status})`)
-      const data = (await res.json()) as { symbols: FileSymbol[]; count: number }
+      const data = await api.symbols<FileSymbol>(workspaceId, filePath)
       allSymbols.value = data.symbols ?? []
       currentPage.value = 0
+      isLargeFile.value = allSymbols.value.length > LARGE_FILE_SYMBOL_THRESHOLD
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load symbols'
       allSymbols.value = []
       currentPage.value = 0
+      isLargeFile.value = false
     } finally {
       loading.value = false
     }
@@ -64,6 +66,7 @@ export function useSymbolBrief() {
     currentPage.value = 0
     loading.value = false
     error.value = null
+    isLargeFile.value = false
   }
 
   return {
@@ -75,6 +78,7 @@ export function useSymbolBrief() {
     hasPrevPage,
     loading,
     error,
+    isLargeFile,
     load,
     reset,
     advancePage,
