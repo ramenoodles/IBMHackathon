@@ -13,7 +13,8 @@ export interface FlowViewport {
 export function useFlowPanZoom(viewportRef: Ref<HTMLElement | null>, contentRef: Ref<HTMLElement | null>) {
   const panzoom = ref<PanzoomObject | null>(null)
 
-  function bind(): void {
+  function bind(preserveViewport = false): void {
+    const saved = preserveViewport ? getViewport() : null
     unbind()
     const viewport = viewportRef.value
     const content = contentRef.value
@@ -32,6 +33,11 @@ export function useFlowPanZoom(viewportRef: Ref<HTMLElement | null>, contentRef:
     })
 
     panzoom.value = instance
+
+    if (saved) {
+      instance.zoom(saved.scale, { animate: false })
+      instance.pan(saved.x, saved.y, { animate: false })
+    }
 
     const onWheel = (e: WheelEvent) => {
       instance.zoomWithWheel(e)

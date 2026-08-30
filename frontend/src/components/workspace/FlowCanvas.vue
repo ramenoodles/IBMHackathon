@@ -95,8 +95,8 @@ const { bind: bindPanZoom, unbind: unbindPanZoom, zoomIn, zoomOut, centerView, g
   panContent,
 )
 
-const lastCenteredKey = ref('')
 const lastBoundKey = ref('')
+const lastSymbol = ref('')
 
 const graphMountKey = computed(
   () => `${props.symbol}:${graphStructureKey(props.nodes, props.edges)}`,
@@ -108,13 +108,14 @@ function onGraphRender(reason: 'structure' | 'label'): void {
     const key = graphMountKey.value
     const isNewSvg = lastBoundKey.value !== key
     if (isNewSvg) {
-      // SVG was recreated — re-attach pan/zoom and position the viewport.
-      const shouldCenter = lastCenteredKey.value !== key
-      bindPanZoom()
+      const symbolChanged = lastSymbol.value !== props.symbol
+      lastSymbol.value = props.symbol
+      // Preserve viewport when structure changes within the same symbol (e.g. node expand).
+      // Center the view only when the symbol changes (different graph entirely).
+      bindPanZoom(!symbolChanged)
       lastBoundKey.value = key
-      if (shouldCenter) {
+      if (symbolChanged) {
         centerView()
-        lastCenteredKey.value = key
       }
     }
   })
@@ -142,7 +143,6 @@ const { renderError, setContainer, renderStructural } = useFlowMermaid(
 watch(
   () => props.symbol,
   () => {
-    lastCenteredKey.value = ''
     lastBoundKey.value = ''
   },
 )
