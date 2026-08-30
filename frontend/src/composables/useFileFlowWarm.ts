@@ -52,7 +52,27 @@ export function useFileFlowWarm(cache: ReturnType<typeof useFlowGraphCache>) {
       const frontier = buffer.at(-1) ?? state.rootId
       const horizon = enrichmentHorizon(frontier, state.allEdges, ENRICHMENT_HORIZON_DEPTH, state.enrichedIds)
       const toEnrich = [...new Set([state.rootId, ...buffer, ...horizon])]
-      await enrichSymbolNodes(state, fullPayload, toEnrich, inFlight)
+      const result = await enrichSymbolNodes(
+        state.allNodes,
+        fullPayload,
+        toEnrich,
+        inFlight,
+        state.enrichedIds,
+      )
+      const byId = new Map(state.allNodes.map((n) => [n.id, n]))
+      for (const patch of result.patches) {
+        const node = byId.get(patch.id)
+        if (!node) continue
+        if (patch.title) node.title = patch.title
+        if (patch.summary) node.summary = patch.summary
+        if (patch.labelSource) {
+          node.labelSource = patch.labelSource as (typeof node)['labelSource']
+          if (patch.labelSource === 'ai' || patch.labelSource === 'heuristic') {
+            node.confidence = 'inferred'
+          }
+        }
+        state.enrichedIds.add(patch.id)
+      }
       cache.set(payload.filePath, sym, state)
       progress.value = {
         ...progress.value,

@@ -1,6 +1,4 @@
-import type { EnrichNodeInput, GraphRootPayload } from '@/types/flowGraph'
-import type { FlowGraph } from '@/types/flowGraph'
-import type { SymbolFlowState } from '@/utils/flowGraphUtils'
+import type { EnrichNodeInput, FlowNode, FlowGraph, GraphRootPayload } from '@/types/flowGraph'
 import { api } from '@/api'
 
 export async function fetchGraphRoot(payload: GraphRootPayload): Promise<FlowGraph> {
@@ -15,15 +13,26 @@ function sortByPriority(ids: string[], priority: Set<string>): string[] {
   })
 }
 
+export interface EnrichPatchResult {
+  patches: Array<{
+    id: string
+    title?: string
+    summary?: string
+    labelSource?: string
+  }>
+  enrichError: string | null
+}
+
 export async function enrichSymbolNodes(
-  state: SymbolFlowState,
+  nodes: FlowNode[],
   payload: GraphRootPayload,
   nodeIds: string[],
   inFlight?: Set<string>,
+  alreadyEnriched?: Set<string>,
   priorityIds?: Set<string>,
-): Promise<{ enrichError: string | null }> {
-  let pending = nodeIds.filter((id) => !state.enrichedIds.has(id) && !inFlight?.has(id))
-  if (pending.length === 0) return { enrichError: null }
+): Promise<EnrichPatchResult> {
+  let pending = nodeIds.filter((id) => !alreadyEnriched?.has(id) && !inFlight?.has(id))
+  if (pending.length === 0) return { patches: [], enrichError: null }
 
   if (priorityIds?.size) {
     pending = sortByPriority(pending, priorityIds)
@@ -31,7 +40,8 @@ export async function enrichSymbolNodes(
 
   for (const id of pending) inFlight?.add(id)
 
-  const byId = new Map(state.allNodes.map((n) => [n.id, n]))
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const allPatches: EnrichPatchResult['patches'] = []
   let enrichError: string | null = null
   try {
     for (let i = 0; i < pending.length; i += 8) {
@@ -55,17 +65,7 @@ export async function enrichSymbolNodes(
           userContext: payload.userContext,
         })
         for (const patch of data.patches ?? []) {
-          const node = state.allNodes.find((n) => n.id === patch.id)
-          if (!node) continue
-          if (patch.title) node.title = patch.title
-          if (patch.summary) node.summary = patch.summary
-          if (patch.labelSource) {
-            node.labelSource = patch.labelSource
-            if (patch.labelSource === 'ai' || patch.labelSource === 'heuristic') {
-              node.confidence = 'inferred'
-            }
-          }
-          state.enrichedIds.add(patch.id)
+          allPatches.push({ id: patch.id, title: patch.title, summary: patch.summary, labelSource: patch.labelSource })
         }
       } catch (err) {
         enrichError = err instanceof Error ? err.message : 'Failed to label flow steps'
@@ -75,5 +75,5 @@ export async function enrichSymbolNodes(
   } finally {
     for (const id of pending) inFlight?.delete(id)
   }
-  return { enrichError }
+  return { patches: allPatches, enrichError }
 }

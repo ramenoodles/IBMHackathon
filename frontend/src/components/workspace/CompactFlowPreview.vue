@@ -60,18 +60,8 @@ async function loadPreview(): Promise<void> {
     edges.value = graph.edges
 
     if (!props.scanOnly) {
-      const state = {
-        allNodes: nodes.value.map((n) => ({ ...n })),
-        allEdges: [...edges.value],
-        rootId: graph.rootId,
-        revealedIds: new Set(graph.nodes.map((n) => n.id)),
-        enrichedIds: new Set<string>(),
-        isMock: Boolean(graph.mock),
-        parentPath: [],
-        fullyExpanded: false,
-      }
       void enrichSymbolNodes(
-        state,
+        nodes.value,
         {
           workspaceId: props.workspaceId,
           filePath: props.filePath,
@@ -79,8 +69,21 @@ async function loadPreview(): Promise<void> {
           userContext: props.userContext,
         },
         graph.nodes.map((n) => n.id),
-      ).then(() => {
-        nodes.value = state.allNodes
+      ).then((result) => {
+        const byId = new Map(nodes.value.map((n) => [n.id, n]))
+        for (const patch of result.patches) {
+          const node = byId.get(patch.id)
+          if (!node) continue
+          if (patch.title) node.title = patch.title
+          if (patch.summary) node.summary = patch.summary
+          if (patch.labelSource) {
+            node.labelSource = patch.labelSource as FlowNode['labelSource']
+            if (patch.labelSource === 'ai' || patch.labelSource === 'heuristic') {
+              node.confidence = 'inferred'
+            }
+          }
+        }
+        nodes.value = [...nodes.value]
       })
     }
   } catch (err) {

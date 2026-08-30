@@ -1,6 +1,6 @@
 import { type MaybeRefOrGetter, ref, toValue, watch } from 'vue'
 import type { FlowEdge, FlowNode } from '@/types/flowGraph'
-import { renderMermaid } from '@/composables/useMermaid'
+import { compileMermaidSvg } from '@/composables/useMermaid'
 
 /** Mermaid reserved words that break when used as node ids. */
 const MERMAID_RESERVED = new Set([
@@ -24,7 +24,7 @@ const MERMAID_RESERVED = new Set([
   'default',
 ])
 
-const STRUCTURAL_RENDER_DEBOUNCE_MS = 75
+const STRUCTURAL_RENDER_DEBOUNCE_MS = 150
 const MERMAID_STYLE_CLASSES = ['verified', 'inferred', 'heuristic', 'collapsed'] as const
 
 export type FlowRenderReason = 'structure' | 'label'
@@ -245,27 +245,58 @@ export function useFlowMermaid(
   const renderError = ref<string | null>(null)
   const containerRef = ref<HTMLElement | null>(null)
   let structuralTimer: ReturnType<typeof setTimeout> | null = null
+  let renderGeneration = 0
   let lastStructureKey = ''
   let lastLabelKey = ''
 
   async function renderStructural(): Promise<void> {
-    const nodeList = toValue(nodes)
+    // Cancel any pending debounce — this call supersedes it.
+    cancelStructuralRender()
+    // Bump the generation so any older in-flight render knows to discard its result.
+    const generation = ++renderGeneration
     const edgeList = toValue(edges)
-    mermaidCode.value = compileToMermaid(nodeList, edgeList, labelMode)
+    // Re-read nodes at render time (not at schedule time) so any enrichment
+    // patches applied during the debounce window are included in the first SVG.
+    const latestNodeList = toValue(nodes)
+    mermaidCode.value = compileToMermaid(latestNodeList, edgeList, labelMode)
     if (!containerRef.value || !mermaidCode.value) return
     try {
       renderError.value = null
-      await renderMermaid(containerRef.value, mermaidCode.value)
-      if (onNodeClick) attachNodeClicks(containerRef.value, nodeList, onNodeClick)
-      applySelectionHighlight(containerRef.value, nodeList, toValue(selectedNodeId))
+      const svg = await compileMermaidSvg(mermaidCode.value)
+      // A newer render started while we were awaiting Mermaid — discard entirely.
+      if (generation !== renderGeneration || !containerRef.value) return
+      containerRef.value.innerHTML = svg
+      // Re-read nodes AFTER the await so any enrichment patches that arrived
+      // while Mermaid was compiling are included in the label pass.  Using a
+      // stale snapshot here would overwrite freshly-enriched labels and leave
+      // lastLabelKey pointing at the unenriched key, causing the chart to
+      // permanently show raw function names for the current symbol.
+      const currentNodeList = toValue(nodes)
+      const currentEdgeList = toValue(edges)
+      applyLabelPatches(containerRef.value, currentNodeList)
+      if (onNodeClick) attachNodeClicks(containerRef.value, currentNodeList, onNodeClick)
+      applySelectionHighlight(containerRef.value, currentNodeList, toValue(selectedNodeId))
+      // Sync both keys so subsequent syncFromGraph calls correctly classify
+      // any further changes as label-only rather than structural.
+      lastStructureKey = graphStructureKey(currentNodeList, currentEdgeList)
+      lastLabelKey = graphLabelKey(currentNodeList)
       onRender?.('structure')
     } catch (err) {
-      renderError.value = err instanceof Error ? err.message : 'Render failed'
+      if (generation === renderGeneration) {
+        renderError.value = err instanceof Error ? err.message : 'Render failed'
+      }
+    }
+  }
+
+  function cancelStructuralRender(): void {
+    if (structuralTimer) {
+      clearTimeout(structuralTimer)
+      structuralTimer = null
     }
   }
 
   function scheduleStructuralRender(): void {
-    if (structuralTimer) clearTimeout(structuralTimer)
+    cancelStructuralRender()
     structuralTimer = setTimeout(() => {
       structuralTimer = null
       void renderStructural()
@@ -280,12 +311,20 @@ export function useFlowMermaid(
 
     if (structureKey !== lastStructureKey) {
       lastStructureKey = structureKey
-      lastLabelKey = labelKey
+      // Don't update lastLabelKey here — renderStructural will set it after
+      // reading the latest labels, so a concurrent enrichment patch during the
+      // debounce window doesn't cause a spurious second applyLabelPatches call.
       scheduleStructuralRender()
       return
     }
 
     if (labelKey !== lastLabelKey) {
+      // Only commit the new label key if the container exists and the patch
+      // can actually be applied.  If the SVG hasn't been written yet (container
+      // is null or the structural render is still in-flight), leave lastLabelKey
+      // dirty so that the next syncFromGraph call — or the structural render
+      // itself — will pick it up.
+      if (!containerRef.value) return
       lastLabelKey = labelKey
       applyLabelPatches(containerRef.value, nodeList)
       applySelectionHighlight(containerRef.value, nodeList, toValue(selectedNodeId))

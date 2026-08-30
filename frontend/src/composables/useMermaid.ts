@@ -47,6 +47,17 @@ export async function renderMermaid(container: HTMLElement, code: string): Promi
 }
 
 /**
+ * Compile Mermaid source to an SVG string without writing to the DOM.
+ * Allows the caller to guard against stale renders before committing.
+ */
+export async function compileMermaidSvg(code: string): Promise<string> {
+  ensureMermaidInit()
+  const id = `mermaid-${Date.now()}`
+  const { svg } = await mermaid.render(id, code)
+  return svg
+}
+
+/**
  * Composable that watches streamed markdown and renders Mermaid when a block completes.
  * @param markdown - Reactive ref of the full LLM response text.
  */
