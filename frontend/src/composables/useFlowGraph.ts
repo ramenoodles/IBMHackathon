@@ -278,6 +278,21 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
   ): Promise<void> {
     if (fullyExpanded.value || mappingFullFlow.value) return
 
+    const EXPAND_WEIGHT = 0.72
+    const ENRICH_WEIGHT = 0.28
+
+    function setMappingProgress(
+      expandDone: number,
+      expandGoal: number,
+      enrichDone: number,
+      enrichGoal: number,
+    ): void {
+      const expandRatio = expandGoal > 0 ? Math.min(1, expandDone / expandGoal) : 1
+      const enrichRatio = enrichGoal > 0 ? Math.min(1, enrichDone / enrichGoal) : 1
+      const pct = expandRatio * EXPAND_WEIGHT + enrichRatio * ENRICH_WEIGHT
+      mappingProgress.value = Math.min(99, Math.round(pct * 100))
+    }
+
     if (rootId.value) {
       const pruned = pruneGraphToRoot(rootId.value, allNodes.value, allEdges.value)
       allNodes.value = pruned.nodes
@@ -289,9 +304,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     error.value = null
 
     try {
-      const initialCollapsed = collapsedExpandableNodes()
-      const total = Math.max(initialCollapsed.length, 1)
-      let processed = 0
+      let expandedCount = 0
       let guard = 0
       while (guard < 32) {
         guard++
@@ -311,18 +324,24 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
           )
           if (!fragment) continue
           mergeFragment(fragment, true)
-          processed += 1
-          mappingProgress.value = Math.min(100, Math.round((processed / total) * 100))
+          expandedCount += 1
           expandedAny = true
+          const remaining = collapsedExpandableNodes().length
+          setMappingProgress(expandedCount, expandedCount + remaining, 0, 1)
         }
         if (!expandedAny) break
       }
 
       revealAllKnownNodes()
-      mappingProgress.value = 100
-
+      const expandGoal = Math.max(expandedCount, 1)
       const allIds = allNodes.value.map((n) => n.id)
-      await enrichNodes(allIds, { background: false })
+      const enrichGoal = allIds.length
+
+      for (let i = 0; i < allIds.length; i += 8) {
+        const batch = allIds.slice(i, i + 8)
+        await enrichNodes(batch, { background: false })
+        setMappingProgress(expandGoal, expandGoal, Math.min(enrichGoal, i + batch.length), enrichGoal)
+      }
 
       fullyExpanded.value = collapsedExpandableNodes().length === 0
       if (!fullyExpanded.value) {
@@ -332,8 +351,10 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to map full flow'
     } finally {
-      mappingFullFlow.value = false
       mappingProgress.value = 100
+      await new Promise((resolve) => setTimeout(resolve, 400))
+      mappingFullFlow.value = false
+      mappingProgress.value = 0
     }
   }
 
