@@ -24,6 +24,7 @@ type Handler struct {
 	WatsonxAPIKey     string
 	WatsonxProjectID  string
 	WatsonxEnabled    bool
+	AllowLocalSource  bool
 	MaxBodyBytes      int64
 	MaxFileBytes      int64
 }
@@ -35,6 +36,7 @@ type Options struct {
 	WatsonxAPIKey    string
 	WatsonxProjectID string
 	WatsonxEnabled   bool
+	AllowLocalSource bool
 	MaxBodyBytes     int64
 	MaxFileBytes     int64
 }
@@ -53,6 +55,7 @@ func New(m *workspace.Manager, opts Options) *Handler {
 		WatsonxAPIKey:    opts.WatsonxAPIKey,
 		WatsonxProjectID: opts.WatsonxProjectID,
 		WatsonxEnabled:   opts.WatsonxEnabled,
+		AllowLocalSource: opts.AllowLocalSource,
 		MaxBodyBytes:     opts.MaxBodyBytes,
 		MaxFileBytes:     opts.MaxFileBytes,
 	}
@@ -79,7 +82,11 @@ func fail(w http.ResponseWriter, status int, msg string) {
 	write(w, status, map[string]any{"error": map[string]string{"code": http.StatusText(status), "message": msg}})
 }
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
-	write(w, 200, map[string]any{"status": "ok", "watsonx": h.WatsonxEnabled})
+	write(w, 200, map[string]any{
+		"status":           "ok",
+		"watsonx":          h.WatsonxEnabled,
+		"allowLocalSource": h.AllowLocalSource,
+	})
 }
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, h.MaxBodyBytes)

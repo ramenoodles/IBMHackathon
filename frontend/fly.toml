@@ -1,0 +1,22 @@
+# Fly.io app for the Vue/nginx frontend. Deploy from frontend/: fly deploy
+# Proxies /api to the backend via Fly private network (onbober-api.internal).
+app = 'onbober-web'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile.fly'
+
+[env]
+  API_UPSTREAM = 'onbober-api.internal:8080'
+
+[http_service]
+  internal_port = 80
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1

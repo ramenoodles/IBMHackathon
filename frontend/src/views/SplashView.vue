@@ -55,7 +55,7 @@ const steps = [
   },
   {
     title: 'Load any codebase',
-    body: 'Try the demo repo, paste a GitHub URL, point at a local folder, or upload a zip.',
+    body: 'Try the demo repo, paste a GitHub URL, or upload a zip.',
     beaver: false,
   },
   {

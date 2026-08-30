@@ -13,6 +13,12 @@ export interface Workspace {
   source?: string
 }
 
+export interface HealthResponse {
+  status: string
+  watsonx: boolean
+  allowLocalSource: boolean
+}
+
 export interface FileResponse {
   path: string
   content: string
@@ -67,6 +73,10 @@ function jsonBody(body: unknown): RequestInit {
 }
 
 export const api = {
+  health(): Promise<HealthResponse> {
+    return request<HealthResponse>('/api/health')
+  },
+
   createWorkspace(body: { source: 'local' | 'github'; path?: string; url?: string }): Promise<Workspace> {
     return request<Workspace>('/api/workspaces', jsonBody(body))
   },

@@ -39,6 +39,7 @@ func main() {
 		WatsonxAPIKey:    cfg.WatsonxAPIKey,
 		WatsonxProjectID: cfg.WatsonxProjectID,
 		WatsonxEnabled:   cfg.WatsonxAPIKey != "" && cfg.WatsonxProjectID != "" && cfg.WatsonxModel != "",
+		AllowLocalSource: cfg.AllowLocalSource,
 		MaxBodyBytes:     cfg.MaxBodyBytes,
 		MaxFileBytes:     cfg.MaxFileBytes,
 	})

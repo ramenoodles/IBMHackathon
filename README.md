@@ -87,6 +87,7 @@ Copy `.env.example` to `.env` and adjust as needed.
 | [`docs/BACKEND.md`](docs/BACKEND.md) | Full backend reference: all packages, types, algorithms, security model, tests |
 | [`docs/FRONTEND.md`](docs/FRONTEND.md) | Full frontend reference: views, components, composables, state, styling |
 | [`docs/API.md`](docs/API.md) | Complete HTTP API reference with request/response schemas |
+| [`docs/IBM-BOB-STATEMENT.md`](docs/IBM-BOB-STATEMENT.md) | How the team used IBM Bob and watsonx.ai to build OnBober |
 
 ---
 

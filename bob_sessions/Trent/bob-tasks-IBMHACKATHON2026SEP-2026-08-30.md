@@ -1,5 +1,8 @@
 # ng...
 client:968 [vite] connected.
+
+![IBM BOB — workspace flow and backend explain extension](screenshots/workspace-flow-backend-extending.png)
+
 api/workspaces/ws-d7ab95a04fc03e5a848a164c/tree:1  Failed to load resource: the server responded with a status of 404 (Not Found)
 installHook.js:1 [Vue warn]: Unhandled error during execution of mounted hook 
   at <Sidebar workspace-id="ws-d7ab95a04fc03e5a848a164c" selected-path="" open=true  ... > 
@@ -2980,6 +2983,9 @@ The phrases:
 # Details
 ›
 _normalize_email()
+
+![IBM BOB — Watsonx env investigation](screenshots/watsonx-env-investigation.png)
+
 verified structureentry
 def _normalize_email(cls, value: str) -> str:
 AI label
@@ -3598,6 +3604,8 @@ The most common reason "I installed it but it still doesn't work" on Windows is 
 
 # let's fix the zoomoffset causing fit to get off of its intended resulting viewport
 
+![IBM BOB — zoom offset viewport fix](screenshots/zoom-offset-viewport-fix.png)
+
 ---
 
 **Status:** active  **Date:** 2026-08-30
@@ -4067,6 +4075,8 @@ Done — [`⊙` on line 273](IBMHackathon/frontend/src/components/workspace/Flow
 ===
 
 # make an extensive plan to tackel the follow ing task for mePaginate symbols by default in sets of 8, have arrow called "load next page of symbols". Keep already loaded symbols in cache, so going back to previous pages doesn't reprocess already cahed/loaded symbol trees. Remove initial checkbox selection window and replace with yes/no message asking if they would like to load the first 8 symbols in the file.
+
+![IBM BOB — symbol pagination implementation](screenshots/symbol-pagination-implementation.png)
 
 ---
 
@@ -5574,6 +5584,9 @@ Clean. Here's what was wrong and what's fixed:
 ===
 
 # rmPluginContext._formatLog (file:///C:/Users/Trent/Desktop/IBMHACKATHON2026SEP/IBMHackathon/frontend/node_modules/vite/dist/node/chunks/node.js:31147:39)
+
+![IBM BOB — FileFlowBrief import fix](screenshots/fileflowbrief-import-fix.png)
+
       at TransformPluginContext.error (file:///C:/Users/Trent/Desktop/IBMHACKATHON2026SEP/IBMHackathon/frontend/node_modules/vite/dist/node/chunks/node.js:31144:14)
       at normalizeUrl (file:///C:/Users/Trent/Desktop/IBMHACKATHON2026SEP/IBMHackathon/frontend/node_modules/vite/dist/node/chunks/node.js:28083:18)
       at async file:///C:/Users/Trent/Desktop/IBMHACKATHON2026SEP/IBMHackathon/frontend/node_modules/vite/dist/node/chunks/node.js:28153:30
