@@ -226,16 +226,6 @@ function fileName(): string {
     <header class="flex items-center gap-3 border-b border-slate-800 bg-slate-900 px-4 py-2.5">
       <button
         type="button"
-        class="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
-        aria-label="Toggle files"
-        @click="toggleSidebar"
-      >
-        <svg class="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
-          <path d="M2 4h12M2 8h12M2 12h12" />
-        </svg>
-      </button>
-      <button
-        type="button"
         class="cursor-pointer transition-opacity hover:opacity-70"
         title="Go home"
         @click="leaveConfirmOpen = true"
