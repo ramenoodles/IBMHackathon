@@ -1,8 +1,9 @@
 import { ref } from 'vue'
 import { api, type Workspace } from '@/api'
+import { DEMO_REPO_URL } from '@/constants/demoRepo'
 
 /** Source type for workspace onboarding step. */
-export type WorkspaceSource = 'local' | 'github' | 'zip'
+export type WorkspaceSource = 'demo' | 'local' | 'github' | 'zip'
 
 /**
  * Composable for registering a workspace via local path, GitHub URL, or zip upload.
@@ -27,6 +28,11 @@ export function useWorkspaceSetup() {
    */
   async function setupGitHub(url: string): Promise<Workspace> {
     return setup({ source: 'github', url })
+  }
+
+  /** Clone the bundled IBM Bob demo repository. */
+  async function setupDemo(): Promise<Workspace> {
+    return setupGitHub(DEMO_REPO_URL)
   }
 
   /**
@@ -72,6 +78,7 @@ export function useWorkspaceSetup() {
     error,
     setupLocal,
     setupGitHub,
+    setupDemo,
     setupZip,
   }
 }

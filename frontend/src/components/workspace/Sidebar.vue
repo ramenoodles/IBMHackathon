@@ -2,7 +2,7 @@
 /**
  * Slim file explorer sidebar.
  */
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, provide, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import FileTreeNode from '@/components/workspace/FileTreeNode.vue'
 import { fetchTreeEntries, type TreeEntry } from '@/composables/useFileTree'
@@ -23,6 +23,13 @@ const emit = defineEmits<{
 
 const entries = ref<TreeEntry[]>([])
 const loading = ref(false)
+const collapseAllTick = ref(0)
+
+provide('fileTreeCollapseAll', collapseAllTick)
+
+function collapseAll(): void {
+  collapseAllTick.value++
+}
 
 const router = useRouter()
 
@@ -57,17 +64,30 @@ watch(() => props.workspaceId, loadRoot)
   >
     <div class="flex items-center justify-between border-b border-slate-800 px-3 py-2">
       <span class="text-xs font-medium text-slate-400">Files</span>
-      <button
-        type="button"
-        class="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-white"
-        aria-label="Hide file explorer"
-        title="Hide file explorer"
-        @click="emit('toggle')"
-      >
-        <svg class="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M8 2L4 6l4 4" />
-        </svg>
-      </button>
+      <div class="flex items-center gap-0.5">
+        <button
+          type="button"
+          class="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-white"
+          aria-label="Collapse all folders"
+          title="Collapse all folders"
+          @click="collapseAll"
+        >
+          <svg class="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 4h8M2 8h8M6 2v2M6 8v2" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-white"
+          aria-label="Hide file explorer"
+          title="Hide file explorer"
+          @click="emit('toggle')"
+        >
+          <svg class="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 2L4 6l4 4" />
+          </svg>
+        </button>
+      </div>
     </div>
     <div class="flex-1 overflow-y-auto p-1.5 text-sm">
       <p v-if="loading" class="px-2 py-1 text-xs text-slate-500">Loading...</p>

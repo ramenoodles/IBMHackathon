@@ -182,7 +182,7 @@ function onExpandNode(node: FlowNode): void {
     branchNode.value = node
     branchPromptOpen.value = true
   } else {
-    void expandNode(node.id, graphPayload(), node.childCount || 3)
+    void expandNode(node.id, graphPayload(), node.childCount ? node.childCount + 1 : 3)
   }
 }
 

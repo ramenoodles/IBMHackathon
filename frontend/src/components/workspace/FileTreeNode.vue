@@ -2,7 +2,7 @@
 /**
  * Recursive file tree node with lazy-loaded folder children.
  */
-import { ref } from 'vue'
+import { inject, ref, watch, type Ref } from 'vue'
 import FileTreeNode from './FileTreeNode.vue'
 import type { TreeEntry } from '@/composables/useFileTree'
 import { fetchTreeEntries } from '@/composables/useFileTree'
@@ -29,6 +29,11 @@ const children = ref<TreeEntry[]>([])
 const loading = ref(false)
 const loaded = ref(false)
 const error = ref<string | null>(null)
+
+const collapseAllTick = inject<Ref<number>>('fileTreeCollapseAll', ref(0))
+watch(collapseAllTick, () => {
+  expanded.value = false
+})
 
 const depth = props.depth ?? 0
 const indent = `${depth * 12 + 8}px`

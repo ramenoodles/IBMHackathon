@@ -142,10 +142,14 @@ func (b *Builder) resolveCalls(ctx context.Context, graph *Graph, currentContent
 		if node.Kind != "call" || node.CalleeSymbol == "" {
 			continue
 		}
-		target, ok := cache[node.CalleeSymbol]
+		if isInstanceMethodCall(node.Label) {
+			continue
+		}
+		cacheKey := fmt.Sprintf("%s::%s::%d", node.File, node.Label, node.Line)
+		target, ok := cache[cacheKey]
 		if !ok {
-			target = b.resolveCallee(ctx, node.File, currentContent, node.CalleeSymbol, language)
-			cache[node.CalleeSymbol] = target
+			target = b.resolveCallee(ctx, node.File, currentContent, node.CalleeSymbol, language, node.Label)
+			cache[cacheKey] = target
 		}
 		if target.File == "" || target.ChildCount == 0 {
 			continue
@@ -164,9 +168,12 @@ type calleeTarget struct {
 	ChildCount int
 }
 
-func (b *Builder) resolveCallee(ctx context.Context, currentFile, currentContent, symbol, language string) calleeTarget {
-	if steps, err := extractFlow(currentContent, currentFile, symbol); err == nil {
-		return calleeTarget{File: currentFile, Line: steps[0].Line, ChildCount: flowChildCount(steps)}
+func (b *Builder) resolveCallee(ctx context.Context, currentFile, currentContent, symbol, language, label string) calleeTarget {
+	qualified := strings.TrimSuffix(label, "()")
+	if !strings.Contains(qualified, ".") {
+		if steps, err := extractFlow(currentContent, currentFile, symbol); err == nil {
+			return calleeTarget{File: currentFile, Line: steps[0].Line, ChildCount: flowChildCount(steps)}
+		}
 	}
 
 	matches, err := b.finder.Find(ctx, search.Query{

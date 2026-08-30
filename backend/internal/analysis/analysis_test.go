@@ -230,6 +230,51 @@ class Second {
 	}
 }
 
+func TestDictGetCallsAreNotExpandable(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "cities.py", `async def get(self, url, headers=None, **kwargs):
+    return _MockAsyncResponse()
+
+def _normalize_city_record(row):
+    try:
+        lat = float(row.get("lat"))
+        lon = float(row.get("lon"))
+    except (TypeError, ValueError):
+        return None
+    name = (row.get("name") or "").strip()
+    if not name:
+        return None
+    return {"name": name, "lat": lat, "lon": lon}
+`)
+
+	graph, err := newTestBuilder(t, root).Root(context.Background(), "cities.py", "_normalize_city_record")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	getCallCount := 0
+	for _, node := range graph.Nodes {
+		if node.CalleeSymbol == "get" || strings.Contains(node.Label, ".get()") {
+			getCallCount++
+			if node.Collapsed || node.Expandable {
+				t.Fatalf("dict .get() call should not be expandable: %#v", node)
+			}
+		}
+	}
+	if getCallCount == 0 {
+		// With builtin filtering, row.get() lines may classify as assign instead of call.
+		assignCount := 0
+		for _, node := range graph.Nodes {
+			if node.Kind == "assign" {
+				assignCount++
+			}
+		}
+		if assignCount < 2 {
+			t.Fatalf("expected assign steps for row.get() lines, got nodes=%#v", graph.Nodes)
+		}
+	}
+}
+
 func TestAssignmentBeatsCallForDeclarationLines(t *testing.T) {
 	root := t.TempDir()
 	// TypeScript/Vue reactive declarations with generic type parameters and

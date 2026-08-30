@@ -241,7 +241,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
             node.id,
             payload,
             path,
-            node.childCount || 6,
+            node.childCount ? node.childCount + 1 : 6,
           )
           if (!fragment) continue
           mergeFragment(fragment, true)

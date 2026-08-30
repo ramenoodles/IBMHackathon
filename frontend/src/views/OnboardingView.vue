@@ -22,9 +22,10 @@ import {
   WORKSPACE_SETUP_PHRASES,
   ZIP_SETUP_PHRASES,
 } from '@/constants/workspaceSetupPhrases'
+import { DEMO_REPO_LABEL, DEMO_REPO_URL } from '@/constants/demoRepo'
 
 const router = useRouter()
-const { loading, error, setupLocal, setupGitHub, setupZip } = useWorkspaceSetup()
+const { loading, error, setupLocal, setupGitHub, setupDemo, setupZip } = useWorkspaceSetup()
 
 const step = ref(1)
 const totalSteps = 3
@@ -105,12 +106,13 @@ const selectedLanguagesValue = computed(() => {
 })
 const selectedLevel = ref<ExperienceLevel>(userContext.value.experienceLevel || 'junior')
 
-const sourceTab = ref<WorkspaceSource>('local')
+const sourceTab = ref<WorkspaceSource>('demo')
 const localPath = ref('')
 const githubUrl = ref('')
 const zipFile = ref<File | null>(null)
 
 const sourceOptions: { value: WorkspaceSource; label: string }[] = [
+  { value: 'demo', label: 'Try demo' },
   { value: 'local', label: 'Local path' },
   { value: 'github', label: 'GitHub repo' },
   { value: 'zip', label: 'Upload ZIP' },
@@ -118,12 +120,13 @@ const sourceOptions: { value: WorkspaceSource; label: string }[] = [
 
 const setupPhrases = computed(() => {
   if (sourceTab.value === 'zip') return ZIP_SETUP_PHRASES
-  if (sourceTab.value === 'github') return GITHUB_SETUP_PHRASES
+  if (sourceTab.value === 'demo' || sourceTab.value === 'github') return GITHUB_SETUP_PHRASES
   if (sourceTab.value === 'local') return LOCAL_SETUP_PHRASES
   return WORKSPACE_SETUP_PHRASES
 })
 
 const setupSourceLabel = computed(() => {
+  if (sourceTab.value === 'demo') return DEMO_REPO_URL
   if (sourceTab.value === 'zip' && zipFile.value) return zipFile.value.name
   if (sourceTab.value === 'github' && githubUrl.value.trim()) return githubUrl.value.trim()
   if (sourceTab.value === 'local' && localPath.value.trim()) return localPath.value.trim()
@@ -134,6 +137,7 @@ const canProceed = computed(() => {
   if (step.value === 1) return selectedLangLabels.value.size > 0
   if (step.value === 2) return Boolean(selectedLevel.value)
   if (step.value === 3) {
+    if (sourceTab.value === 'demo') return true
     if (sourceTab.value === 'local') return localPath.value.trim().length > 0
     if (sourceTab.value === 'github') return githubUrl.value.trim().length > 0
     if (sourceTab.value === 'zip') return zipFile.value !== null
@@ -156,7 +160,9 @@ async function nextStep(): Promise<void> {
   } else if (step.value === 3) {
     try {
       let workspace: { id: string; name: string } | undefined
-      if (sourceTab.value === 'local') {
+      if (sourceTab.value === 'demo') {
+        workspace = await setupDemo()
+      } else if (sourceTab.value === 'local') {
         workspace = await setupLocal(localPath.value.trim())
       } else if (sourceTab.value === 'github') {
         workspace = await setupGitHub(githubUrl.value.trim())
@@ -283,10 +289,10 @@ function prevStep(): void {
         <template v-else>
           <h2 class="mb-2 text-2xl font-bold text-white">Where is your codebase?</h2>
           <p class="mb-4 text-slate-400">
-            Point to a local folder, paste a GitHub link, or upload a zip archive.
+            Try the IBM Bob demo repo, or point to your own codebase.
           </p>
 
-          <div class="mb-4 flex gap-2">
+          <div class="mb-4 grid grid-cols-2 gap-2">
             <button
               v-for="opt in sourceOptions"
               :key="opt.value"
@@ -303,7 +309,15 @@ function prevStep(): void {
             </button>
           </div>
 
-          <div v-if="sourceTab === 'local'">
+          <div v-if="sourceTab === 'demo'" class="rounded-lg border border-onbober-primary/30 bg-onbober-primary/5 px-4 py-4">
+            <p class="text-sm font-medium text-white">{{ DEMO_REPO_LABEL }}</p>
+            <p class="mt-1 text-sm text-slate-400">
+              IBM's Go Kafka client library — explore flow tracing with no setup required.
+            </p>
+            <p class="mt-3 font-mono text-xs text-slate-500">{{ DEMO_REPO_URL }}</p>
+          </div>
+
+          <div v-else-if="sourceTab === 'local'">
             <input
               v-model="localPath"
               type="text"

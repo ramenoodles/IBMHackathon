@@ -310,6 +310,12 @@ func noiseCallee(name string) bool {
 	// Go / Python builtins
 	case "if", "for", "while", "switch", "return", "len", "str", "int", "dict", "list", "range", "type", "set", "append", "make", "new", "delete", "panic", "print", "println":
 		return true
+	// Python common methods / builtins
+	case "get", "strip", "upper", "lower", "split", "join", "replace", "startswith", "endswith", "items", "keys", "values", "pop", "float", "bool", "isinstance", "encode", "decode":
+		return true
+	// JS/TS common methods
+	case "then", "catch", "push", "slice", "trim", "toString", "valueOf":
+		return true
 	// JS/TS constructors — upper-case constructor names that appear on the RHS
 	// of declarations (new Set(), new Map(), new Array(), …) and carry no
 	// interesting call semantics of their own.
@@ -321,6 +327,21 @@ func noiseCallee(name string) bool {
 		return true
 	}
 	return false
+}
+
+// isInstanceMethodCall reports method calls on a lowercase receiver (e.g. row.get()).
+func isInstanceMethodCall(label string) bool {
+	qualified := strings.TrimSuffix(label, "()")
+	parts := strings.Split(qualified, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	receiver := parts[0]
+	if receiver == "" {
+		return false
+	}
+	first := receiver[0]
+	return (first >= 'a' && first <= 'z') || first == '_'
 }
 
 func stripLineComment(line string) string {
