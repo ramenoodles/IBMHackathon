@@ -422,6 +422,29 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     lastPayload.value = null
   }
 
+  function stripEnrichedLabels(): void {
+    for (const node of allNodes.value) {
+      if (node.labelSource !== 'ai' && node.labelSource !== 'heuristic') continue
+      delete node.title
+      node.summary = node.code?.trim() || node.label || ''
+      delete node.labelSource
+      node.confidence = 'verified'
+    }
+    enrichedIds.value = new Set()
+    inFlightIds.value = new Set()
+  }
+
+  async function reapplyExperience(payload: GraphRootPayload): Promise<void> {
+    if (!symbol.value || allNodes.value.length === 0) return
+    lastPayload.value = payload
+    enrichError.value = null
+    stripEnrichedLabels()
+    syncVisible()
+    persistToCache()
+    const allIds = allNodes.value.map((n) => n.id)
+    await enrichNodes(allIds, { background: false, priorityVisible: true })
+  }
+
   return {
     nodes,
     edges,
@@ -446,5 +469,6 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     hasHiddenChildren,
     prefetchAroundNode,
     reset,
+    reapplyExperience,
   }
 }

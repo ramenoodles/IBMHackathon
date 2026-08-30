@@ -4,6 +4,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import ExperienceLevelToggle from '@/components/workspace/ExperienceLevelToggle.vue'
 import Sidebar from '@/components/workspace/Sidebar.vue'
 import SymbolBar from '@/components/workspace/SymbolBar.vue'
 import FlowCanvas from '@/components/workspace/FlowCanvas.vue'
@@ -20,7 +21,7 @@ import { useFlowGraph } from '@/composables/useFlowGraph'
 import { useSymbolBrief } from '@/composables/useSymbolBrief'
 import { useFileFlowWarm } from '@/composables/useFileFlowWarm'
 import { useNodeDetail } from '@/composables/useNodeDetail'
-import { userContext, normalizeLanguage, clearUserContext } from '@/store/userContext'
+import { userContext, normalizeLanguage, clearUserContext, updateUserContext, type ExperienceLevel } from '@/store/userContext'
 import type { FlowNode } from '@/types/flowGraph'
 
 type WorkspacePhase = 'idle' | 'tracing'
@@ -68,6 +69,7 @@ const {
   hasHiddenChildren,
   prefetchAroundNode,
   reset: resetGraph,
+  reapplyExperience,
 } = useFlowGraph(graphCache)
 
 const {
@@ -78,7 +80,7 @@ const {
   reset: resetSymbols,
 } = useSymbolBrief()
 const { warming, progress } = useFileFlowWarm(graphCache)
-const { detail, loading: detailLoading, streaming: detailStreaming, error: detailError, loadDetail, clear: clearDetail } = useNodeDetail()
+const { detail, loading: detailLoading, streaming: detailStreaming, error: detailError, loadDetail, clear: clearDetail, clearCache: clearDetailCache } = useNodeDetail()
 
 const workspacePhase = ref<WorkspacePhase>('idle')
 const selectedPath = ref('')
@@ -98,6 +100,24 @@ const leaveConfirmOpen = ref(false)
 function openNewWorkspace(): void {
   clearUserContext()
   router.push('/onboarding')
+}
+
+const experienceLevel = computed({
+  get: () => userContext.value.experienceLevel,
+  set: (level: ExperienceLevel) => updateUserContext({ experienceLevel: level }),
+})
+
+async function onExperienceChange(_level: ExperienceLevel): Promise<void> {
+  clearDetailCache()
+  const hadDetail = Boolean(detail.value?.explanation?.trim())
+  clearDetail()
+  if (symbol.value && selectedPath.value) {
+    await reapplyExperience(graphPayload())
+    if (hadDetail && selectedNodeId.value) {
+      const node = nodes.value.find((n) => n.id === selectedNodeId.value)
+      if (node) onRequestDetail(node)
+    }
+  }
 }
 
 const showSymbolBar = computed(
@@ -249,7 +269,8 @@ function fileName(): string {
       <span v-if="selectedPath" class="truncate text-xs text-slate-500">
         {{ fileName() }}
       </span>
-      <div class="ml-auto">
+      <div class="ml-auto flex items-center gap-2">
+        <ExperienceLevelToggle v-model="experienceLevel" @change="onExperienceChange" />
         <button
           type="button"
           class="inline-flex items-center rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-onbober-primary hover:text-white"
