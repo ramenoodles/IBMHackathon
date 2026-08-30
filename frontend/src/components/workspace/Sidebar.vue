@@ -15,6 +15,7 @@ const props = defineProps<{
   selectedPath: string
   open: boolean
   width?: number
+  showBobbers?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -59,7 +60,7 @@ watch(() => props.workspaceId, loadRoot)
 
 <template>
   <aside
-    class="sidebar-panel flex h-full shrink-0 flex-col border-r border-slate-800 bg-slate-900"
+    class="sidebar-panel relative flex h-full shrink-0 flex-col border-r border-slate-800 bg-slate-900"
     :class="open ? 'sidebar-open' : 'sidebar-closed'"
     :style="open ? { width: `${width ?? 176}px` } : { width: '2.75rem' }"
   >
@@ -92,7 +93,7 @@ watch(() => props.workspaceId, loadRoot)
         </div>
       </div>
       <FileSearchBar :workspace-id="workspaceId" @select="emit('select', $event)" />
-      <div class="flex-1 overflow-y-auto p-1.5 text-sm">
+      <div class="relative flex-1 overflow-y-auto p-1.5 text-sm">
         <p v-if="loading" class="px-2 py-1 text-xs text-slate-500">Loading...</p>
         <ul v-else class="space-y-0.5">
           <FileTreeNode
@@ -105,10 +106,24 @@ watch(() => props.workspaceId, loadRoot)
             @select="emit('select', $event)"
           />
         </ul>
+        <img
+          v-if="showBobbers"
+          src="@/assets/logo.png"
+          alt=""
+          class="explorer-bobber pointer-events-none absolute -bottom-1 right-1 h-8 w-auto opacity-[0.07]"
+          aria-hidden="true"
+        />
       </div>
     </template>
 
-    <div v-else class="flex h-full justify-center pt-2">
+    <div v-else class="relative flex h-full justify-center pt-2">
+      <img
+        v-if="showBobbers"
+        src="@/assets/logo.png"
+        alt=""
+        class="explorer-bobber pointer-events-none absolute bottom-3 h-6 w-auto opacity-[0.08]"
+        aria-hidden="true"
+      />
       <button
         type="button"
         class="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition hover:bg-slate-800 hover:text-white"
@@ -139,5 +154,14 @@ watch(() => props.workspaceId, loadRoot)
   min-width: 2.75rem;
   opacity: 1;
   pointer-events: auto;
+}
+
+.explorer-bobber {
+  animation: explorer-bobber-peek 5s ease-in-out infinite;
+}
+
+@keyframes explorer-bobber-peek {
+  0%, 100% { transform: translateY(0) rotate(8deg); }
+  50% { transform: translateY(-3px) rotate(12deg); }
 }
 </style>

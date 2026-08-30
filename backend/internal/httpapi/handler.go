@@ -232,11 +232,13 @@ func (h *Handler) expand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		NodeID      string   `json:"nodeId"`
-		FilePath    string   `json:"filePath"`
-		Symbol      string   `json:"symbol"`
-		ParentPath  []string `json:"parentPath"`
-		ExpandLimit int      `json:"expandLimit"`
+		NodeID        string   `json:"nodeId"`
+		FilePath      string   `json:"filePath"`
+		Symbol        string   `json:"symbol"`
+		ParentPath    []string `json:"parentPath"`
+		ExpandLimit   int      `json:"expandLimit"`
+		CalleeFile    string   `json:"calleeFile"`
+		CalleeSymbol  string   `json:"calleeSymbol"`
 	}
 	if json.NewDecoder(r.Body).Decode(&in) != nil || in.NodeID == "" {
 		fail(w, 400, "nodeId is required")
@@ -247,7 +249,7 @@ func (h *Handler) expand(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, e.Error())
 		return
 	}
-	g, e := b.Expand(r.Context(), in.NodeID, in.ExpandLimit)
+	g, e := b.Expand(r.Context(), in.NodeID, in.ExpandLimit, in.CalleeFile, in.CalleeSymbol)
 	if e != nil {
 		fail(w, 404, e.Error())
 		return

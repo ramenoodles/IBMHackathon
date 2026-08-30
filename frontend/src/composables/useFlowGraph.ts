@@ -22,6 +22,14 @@ import type { useFlowGraphCache } from '@/composables/useFlowGraphCache'
 import { api } from '@/api'
 import { isCompactNode } from '@/utils/flowGraphLabels'
 
+const MAX_EXPAND_NODES = 30
+
+function expandLimitFor(node: FlowNode): number {
+  if (isCompactNode(node)) return MAX_EXPAND_NODES
+  if (node.childCount > 0) return Math.min(MAX_EXPAND_NODES, node.childCount + 1)
+  return 6
+}
+
 /**
  * Manages scan-first flow graph with cache, progressive reveal, and async LLM labels.
  */
@@ -261,22 +269,25 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     return allNodes.value.filter((n) => n.collapsed && n.expandable)
   }
 
-  /** Collapsed nodes that full-flow should inline-expand (skip compact callee folds). */
+  /** Collapsed nodes that full-flow should inline-expand (includes compact callee folds). */
   function inlineExpandableNodes(): FlowNode[] {
-    return collapsedExpandableNodes().filter((n) => !isCompactNode(n))
+    return collapsedExpandableNodes()
   }
 
   async function fetchExpandFragment(
-    nodeId: string,
-    payload: Omit<GraphExpandPayload, 'nodeId' | 'parentPath' | 'expandLimit'>,
+    node: FlowNode,
+    payload: Omit<GraphExpandPayload, 'nodeId' | 'parentPath' | 'expandLimit' | 'calleeFile' | 'calleeSymbol'>,
     path: string[],
     limit: number,
-  ): Promise<FlowGraph | null> {
-    try {
-      return await api.expand({ ...payload, nodeId, parentPath: path, expandLimit: limit })
-    } catch {
-      return null
-    }
+  ): Promise<FlowGraph> {
+    return api.expand({
+      ...payload,
+      nodeId: node.id,
+      parentPath: path,
+      expandLimit: limit,
+      calleeFile: node.calleeFile,
+      calleeSymbol: node.calleeSymbol,
+    })
   }
 
   async function revealFullFlow(
@@ -321,15 +332,10 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
 
         let expandedAny = false
         for (const node of collapsed) {
-          const path = [node.id]
-          const fragment = await fetchExpandFragment(
-            node.id,
-            payload,
-            path,
-            node.childCount ? node.childCount + 1 : 6,
-          )
-          if (!fragment) continue
+          const path = [...parentPath.value, node.id]
+          const fragment = await fetchExpandFragment(node, payload, path, expandLimitFor(node))
           mergeFragment(fragment, true)
+          parentPath.value = path
           expandedCount += 1
           expandedAny = true
           const remaining = inlineExpandableNodes().length
@@ -436,20 +442,20 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
   }
 
   async function expandNode(
-    nodeId: string,
-    payload: Omit<GraphExpandPayload, 'nodeId' | 'parentPath' | 'expandLimit'>,
-    limit = 3,
+    node: FlowNode,
+    payload: Omit<GraphExpandPayload, 'nodeId' | 'parentPath' | 'expandLimit' | 'calleeFile' | 'calleeSymbol'>,
   ): Promise<void> {
     if (fullyExpanded.value) return
+    if (!node.collapsed || !node.expandable) return
 
     expanding.value = true
     error.value = null
-    const path = [nodeId]
+    const path = [...parentPath.value, node.id]
+    const limit = expandLimitFor(node)
 
     try {
-      const fragment = await fetchExpandFragment(nodeId, payload, path, limit)
-      if (!fragment) throw new Error('Expand failed')
-      mergeFragment(fragment)
+      const fragment = await fetchExpandFragment(node, payload, path, limit)
+      mergeFragment(fragment, true)
       parentPath.value = path
       const newIds = fragment.nodes.map((n) => n.id).filter((id) => !revealedIds.value.has(id))
       for (const id of newIds) {

@@ -78,7 +78,9 @@ func (b *Builder) Root(ctx context.Context, file, symbol string) (Graph, error) 
 
 // Expand returns a bounded callee CFG fragment. The existing call node remains
 // the fragment root so the frontend can merge the result without replacing it.
-func (b *Builder) Expand(ctx context.Context, nodeID string, limit int) (Graph, error) {
+// When calleeFile and calleeSymbol are provided they are used directly so the
+// caller CFG does not need to be rebuilt (avoids lookup failures on merged graphs).
+func (b *Builder) Expand(ctx context.Context, nodeID string, limit int, calleeFile, calleeSymbol string) (Graph, error) {
 	meta, err := parseNodeID(nodeID)
 	if err != nil {
 		return Graph{}, err
@@ -87,33 +89,41 @@ func (b *Builder) Expand(ctx context.Context, nodeID string, limit int) (Graph, 
 		return Graph{}, fmt.Errorf("max flow depth reached")
 	}
 
-	container, err := b.buildFunction(ctx, meta.File, meta.Symbol, meta.Depth, MaxRootNodes, false)
-	if err != nil {
-		return Graph{}, err
-	}
-	var call *Node
-	for i := range container.Nodes {
-		if container.Nodes[i].ID == nodeID {
-			call = &container.Nodes[i]
-			break
+	callFile := strings.TrimSpace(calleeFile)
+	callSym := strings.TrimSpace(calleeSymbol)
+	if callFile != "" && callSym != "" {
+		callFile = filepath.ToSlash(filepath.Clean(callFile))
+	} else {
+		container, buildErr := b.buildFunction(ctx, meta.File, meta.Symbol, meta.Depth, MaxRootNodes, false)
+		if buildErr != nil {
+			return Graph{}, buildErr
 		}
-	}
-	if call == nil {
-		return Graph{}, fmt.Errorf("flow node %q not found", nodeID)
-	}
-	if !call.Expandable || call.CalleeFile == "" || call.CalleeSymbol == "" {
-		return Graph{}, fmt.Errorf("flow node %q is not expandable", nodeID)
+		var call *Node
+		for i := range container.Nodes {
+			if container.Nodes[i].ID == nodeID {
+				call = &container.Nodes[i]
+				break
+			}
+		}
+		if call == nil {
+			return Graph{}, fmt.Errorf("flow node %q not found", nodeID)
+		}
+		if !call.Expandable || call.CalleeFile == "" || call.CalleeSymbol == "" {
+			return Graph{}, fmt.Errorf("flow node %q is not expandable", nodeID)
+		}
+		callFile = call.CalleeFile
+		callSym = call.CalleeSymbol
 	}
 
 	if limit <= 0 || limit > MaxExpandNodes {
 		limit = MaxExpandNodes
 	}
-	fragment, err := b.buildFunction(ctx, call.CalleeFile, call.CalleeSymbol, meta.Depth+1, limit, false)
+	fragment, err := b.buildFunction(ctx, callFile, callSym, meta.Depth+1, limit, false)
 	if err != nil {
 		return Graph{}, err
 	}
 	if len(fragment.Nodes) == 0 {
-		return Graph{}, fmt.Errorf("callee %q has no flow steps", call.CalleeSymbol)
+		return Graph{}, fmt.Errorf("callee %q has no flow steps", callSym)
 	}
 	fragment.Edges = append([]Edge{{From: nodeID, To: fragment.RootID, Label: "calls"}}, fragment.Edges...)
 	fragment.RootID = nodeID
@@ -187,7 +197,7 @@ func (b *Builder) resolveCallee(ctx context.Context, currentFile, currentContent
 	if err != nil {
 		return calleeTarget{}
 	}
-	for _, match := range matches {
+	for _, match := range orderCalleeMatches(matches, qualified) {
 		content, readErr := b.reader.ReadFile(match.Path)
 		if readErr != nil {
 			continue
@@ -198,6 +208,26 @@ func (b *Builder) resolveCallee(ctx context.Context, currentFile, currentContent
 		}
 	}
 	return calleeTarget{}
+}
+
+// orderCalleeMatches prefers paths that match a package prefix from a qualified call label.
+func orderCalleeMatches(matches []search.Match, qualified string) []search.Match {
+	parts := strings.Split(qualified, ".")
+	if len(parts) < 2 {
+		return matches
+	}
+	pkg := parts[0]
+	var preferred, rest []search.Match
+	for _, match := range matches {
+		path := filepath.ToSlash(match.Path)
+		dir := filepath.ToSlash(filepath.Dir(path))
+		if strings.HasSuffix(dir, "/"+pkg) || strings.Contains(path, "/"+pkg+"/") {
+			preferred = append(preferred, match)
+		} else {
+			rest = append(rest, match)
+		}
+	}
+	return append(preferred, rest...)
 }
 
 func flowChildCount(steps []flowStep) int {

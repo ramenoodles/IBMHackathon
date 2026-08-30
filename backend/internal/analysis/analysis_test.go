@@ -97,7 +97,7 @@ def parent():
 		t.Fatalf("resolved call = %#v", call)
 	}
 
-	fragment, err := builder.Expand(context.Background(), call.ID, 3)
+	fragment, err := builder.Expand(context.Background(), call.ID, 3, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,6 +114,36 @@ def parent():
 		if node.ID == call.ID {
 			t.Fatal("Expand() duplicated the existing parent node")
 		}
+	}
+}
+
+func TestExpandWithCalleeHintsSkipsCallerRebuild(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "flow.py", `def child():
+    one = 1
+    return one
+
+def parent():
+    value = child()
+    return value
+`)
+
+	builder := newTestBuilder(t, root)
+	graph, err := builder.Root(context.Background(), "flow.py", "parent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	call := firstCallNode(t, graph.Nodes)
+
+	fragment, err := builder.Expand(context.Background(), call.ID, MaxExpandNodes, "flow.py", "child")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fragment.RootID != call.ID || fragment.Symbol != "child" {
+		t.Fatalf("Expand(hints) = %#v", fragment)
+	}
+	if len(fragment.Nodes) == 0 {
+		t.Fatal("Expand(hints) returned no callee nodes")
 	}
 }
 
@@ -161,14 +191,14 @@ def parent():
 		t.Fatal(err)
 	}
 	childCall := firstCallNode(t, graph.Nodes)
-	childFragment, err := builder.Expand(context.Background(), childCall.ID, MaxExpandNodes)
+	childFragment, err := builder.Expand(context.Background(), childCall.ID, MaxExpandNodes, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	leafCall := firstCallNode(t, childFragment.Nodes)
 
 	newBuilder := newTestBuilder(t, root)
-	leafFragment, err := newBuilder.Expand(context.Background(), leafCall.ID, MaxExpandNodes)
+	leafFragment, err := newBuilder.Expand(context.Background(), leafCall.ID, MaxExpandNodes, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { compileToMermaid, graphLabelKey, graphStructureKey, nodeMermaidClasses, nodeScanTitle } from '@/composables/useFlowMermaid'
+import { compileToMermaid, FLOW_EDGE_COLORS, FLOW_EDGE_LEGEND, graphLabelKey, graphStructureKey, nodeMermaidClasses, nodeScanTitle } from '@/composables/useFlowMermaid'
 import type { FlowNode } from '@/types/flowGraph'
 
 const baseNode = (id: string, overrides: Partial<FlowNode> = {}): FlowNode => ({
@@ -56,6 +56,32 @@ describe('compileToMermaid', () => {
     const code = compileToMermaid(nodes, [], 'scan')
     expect(code).toContain('m.mu.Lock()')
     expect(code).not.toContain('Acquire lock')
+  })
+
+  it('colors edges by label in linkStyle', () => {
+    const nodes = [
+      baseNode('a', { kind: 'entry' }),
+      baseNode('b', { kind: 'branch' }),
+      baseNode('c'),
+      baseNode('d'),
+    ]
+    const edges = [
+      { from: 'a', to: 'b', label: 'start' },
+      { from: 'b', to: 'c', label: 'true' },
+      { from: 'b', to: 'd', label: 'false' },
+    ]
+    const code = compileToMermaid(nodes, edges)
+    expect(code).toContain(`stroke:${FLOW_EDGE_COLORS.default}`)
+    expect(code).toContain(`stroke:${FLOW_EDGE_COLORS.true}`)
+    expect(code).toContain(`stroke:${FLOW_EDGE_COLORS.false}`)
+  })
+
+  it('exposes legend entries matching edge colors', () => {
+    expect(FLOW_EDGE_LEGEND.map((item) => item.color)).toEqual([
+      FLOW_EDGE_COLORS.true,
+      FLOW_EDGE_COLORS.false,
+      FLOW_EDGE_COLORS.default,
+    ])
   })
 
   it('separates structure and label keys', () => {
