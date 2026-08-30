@@ -572,36 +572,6 @@ function openDeepDive(): void {
             <template v-else>
               <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-2 py-0.5 text-xs font-bold uppercase text-amber-400">
                 Deep dive
-            </span>
-            <span class="ml-1 inline-block rounded border border-slate-700 px-2 py-0.5 text-xs uppercase text-slate-400">
-              {{ selectedNode.kind }}
-            </span>
-            <pre
-              v-if="selectedNode.code"
-              class="mt-2 overflow-x-auto rounded border border-slate-800 bg-slate-950 p-3 font-mono text-sm leading-relaxed text-slate-200"
-            >{{ selectedNode.code }}</pre>
-            <p v-else class="mt-2 text-sm text-slate-500">No source snippet for this step.</p>
-          </section>
-
-          <section v-if="showAiSummary" class="mt-4">
-            <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-2 py-0.5 text-xs font-bold uppercase text-amber-400">
-              AI label
-            </span>
-            <p class="mt-2 text-sm leading-relaxed text-amber-300/90">{{ selectedNode.summary }}</p>
-          </section>
-
-          <section class="mt-4">
-            <button
-              v-if="!deepDiveOpen"
-              type="button"
-              class="w-full rounded-md border border-slate-700 px-3 py-2.5 text-left text-sm text-slate-300 transition hover:border-onbober-primary/50 hover:text-white"
-              @click="openDeepDive"
-            >
-              Explain this step
-            </button>
-            <template v-else>
-              <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-2 py-0.5 text-xs font-bold uppercase text-amber-400">
-                Deep dive
               </span>
               <LoadingStatus
                 class="mt-3"
