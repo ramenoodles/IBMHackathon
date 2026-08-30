@@ -163,6 +163,19 @@ func TestParseEnrichResponseStripsMarkdownFence(t *testing.T) {
 	}
 }
 
+func TestParseEnrichResponseTrailingObject(t *testing.T) {
+	// LLM occasionally returns two concatenated top-level objects; only the
+	// first should be parsed and the rest silently ignored.
+	raw := `{"patches":[{"id":"a","title":"Test","summary":"One sentence."}]},{"patches":[]}`
+	patches, err := parseEnrichResponse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(patches) != 1 || patches[0].ID != "a" {
+		t.Fatalf("patches = %#v", patches)
+	}
+}
+
 func TestEnrichSaramaCloseLikeFlowWithoutLLM(t *testing.T) {
 	service := newTestService(t, nil, false)
 	nodes := []EnrichNodeInput{

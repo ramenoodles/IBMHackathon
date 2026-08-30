@@ -222,12 +222,9 @@ func parseEnrichResponse(raw string) ([]EnrichPatch, error) {
 	if i := strings.Index(raw, "{"); i > 0 {
 		raw = raw[i:]
 	}
-	if j := strings.LastIndex(raw, "}"); j >= 0 && j < len(raw)-1 {
-		raw = raw[:j+1]
-	}
 
 	var parsed enrichLLMResponse
-	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+	if err := json.NewDecoder(strings.NewReader(raw)).Decode(&parsed); err != nil {
 		return nil, err
 	}
 	return parsed.Patches, nil
