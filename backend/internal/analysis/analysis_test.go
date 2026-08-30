@@ -230,6 +230,40 @@ class Second {
 	}
 }
 
+func TestAssignmentBeatsCallForDeclarationLines(t *testing.T) {
+	root := t.TempDir()
+	// TypeScript/Vue reactive declarations with generic type parameters and
+	// constructor calls on the RHS must be classified as "assign", not "call".
+	writeTestFile(t, root, "store.ts", `export function useStore() {
+  const revealedIds = ref<Set<string>>(new Set())
+  const count = ref(0)
+  const items = reactive<Item[]>([])
+  const map = new Map<string, number>()
+  processItems(items)
+  return { revealedIds, count, items, map }
+}
+`)
+
+	graph, err := newTestBuilder(t, root).Root(context.Background(), "store.ts", "useStore")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kinds := make(map[string]int)
+	for _, node := range graph.Nodes {
+		kinds[node.Kind]++
+	}
+
+	// All four declarations must be assigns, not calls
+	if kinds["assign"] < 4 {
+		t.Fatalf("expected ≥4 assign nodes, got kinds=%v nodes=%v", kinds, graph.Nodes)
+	}
+	// The bare processItems(items) call must still be detected
+	if kinds["call"] < 1 {
+		t.Fatalf("expected ≥1 call node for processItems(), got kinds=%v", kinds)
+	}
+}
+
 func newTestBuilder(t *testing.T, root string) *Builder {
 	t.Helper()
 	builder, err := New(root, "rg")

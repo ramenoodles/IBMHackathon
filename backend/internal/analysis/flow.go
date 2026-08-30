@@ -275,11 +275,11 @@ func classifyLine(line bodyLine) (flowStep, bool) {
 		}
 		return newStep(line, kind, shorten(clean, 44), "Exit the function", "", ""), true
 	}
-	if callee, qualified := primaryCallee(clean); callee != "" {
-		return newStep(line, "call", qualified+"()", "Calls "+strings.ReplaceAll(callee, "_", " "), "", callee), true
-	}
 	if assignPattern.MatchString(clean) {
 		return newStep(line, "assign", shorten(clean, 44), "Assign: "+shorten(clean, 60), "", ""), true
+	}
+	if callee, qualified := primaryCallee(clean); callee != "" {
+		return newStep(line, "call", qualified+"()", "Calls "+strings.ReplaceAll(callee, "_", " "), "", callee), true
 	}
 	return flowStep{}, false
 }
