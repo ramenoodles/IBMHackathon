@@ -95,6 +95,7 @@ const { bind: bindPanZoom, unbind: unbindPanZoom, zoomIn, zoomOut, centerView, g
 )
 
 const lastCenteredKey = ref('')
+const lastBoundKey = ref('')
 
 const graphMountKey = computed(
   () => `${props.symbol}:${graphStructureKey(props.nodes, props.edges)}`,
@@ -103,14 +104,17 @@ const graphMountKey = computed(
 function onGraphRender(reason: 'structure' | 'label'): void {
   if (reason === 'label') return
   void nextTick(() => {
-    const prior = getViewport()
-    const shouldCenter = lastCenteredKey.value !== graphMountKey.value
-    bindPanZoom()
-    if (shouldCenter) {
-      centerView()
-      lastCenteredKey.value = graphMountKey.value
-    } else if (prior) {
-      setViewport(prior)
+    const key = graphMountKey.value
+    const isNewSvg = lastBoundKey.value !== key
+    if (isNewSvg) {
+      // SVG was recreated — re-attach pan/zoom and position the viewport.
+      const shouldCenter = lastCenteredKey.value !== key
+      bindPanZoom()
+      lastBoundKey.value = key
+      if (shouldCenter) {
+        centerView()
+        lastCenteredKey.value = key
+      }
     }
   })
 }
@@ -138,6 +142,7 @@ watch(
   () => props.symbol,
   () => {
     lastCenteredKey.value = ''
+    lastBoundKey.value = ''
   },
 )
 

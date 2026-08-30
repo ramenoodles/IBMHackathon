@@ -6,7 +6,7 @@ import type {
   GraphExpandPayload,
   GraphRootPayload,
 } from '@/types/flowGraph'
-import { enrichSymbolNodes, fetchGraphRoot } from '@/utils/flowGraphEnrich'
+import { enrichSymbolNodes, fetchGraphRoot, type EnrichPatchResult } from '@/utils/flowGraphEnrich'
 import {
   ENRICHMENT_HORIZON_DEPTH,
   SILENT_BUFFER_STEPS,
@@ -109,14 +109,40 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
 
     if (!opts?.background) enriching.value = true
     try {
-      const state = snapshotState()
       const priorityIds = opts?.priorityVisible ? new Set(revealedIds.value) : undefined
-      const result = await enrichSymbolNodes(state, payload, pending, inFlightIds.value, priorityIds)
+      // Pass a snapshot of the current nodes for input building only.
+      // Patches are applied directly to the live allNodes.value after the await
+      // so concurrent enrichment calls cannot clobber each other's results.
+      const result: EnrichPatchResult = await enrichSymbolNodes(
+        allNodes.value,
+        payload,
+        pending,
+        inFlightIds.value,
+        enrichedIds.value,
+        priorityIds,
+      )
       if (result.enrichError) {
         enrichError.value = result.enrichError
       }
-      allNodes.value = state.allNodes
-      enrichedIds.value = state.enrichedIds
+      // Apply patches onto live allNodes — never replace the whole array.
+      const byId = new Map(allNodes.value.map((n) => [n.id, n]))
+      const newEnrichedIds = new Set(enrichedIds.value)
+      for (const patch of result.patches) {
+        const node = byId.get(patch.id)
+        if (!node) continue
+        if (patch.title) node.title = patch.title
+        if (patch.summary) node.summary = patch.summary
+        if (patch.labelSource) {
+          node.labelSource = patch.labelSource as FlowNode['labelSource']
+          if (patch.labelSource === 'ai' || patch.labelSource === 'heuristic') {
+            node.confidence = 'inferred'
+          }
+        }
+        newEnrichedIds.add(patch.id)
+      }
+      // Trigger reactivity by replacing the array reference.
+      allNodes.value = [...allNodes.value]
+      enrichedIds.value = newEnrichedIds
       syncVisible()
       persistToCache()
     } finally {
@@ -315,6 +341,7 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     const cached = cache.get(payload.filePath, sym)
     if (!cached) return false
     error.value = null
+    loading.value = false
     currentFilePath.value = payload.filePath
     currentWorkspace.value = payload.workspaceId
     lastPayload.value = { ...payload, symbol: sym }
@@ -342,8 +369,18 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
     fullyExpanded.value = false
     revealedIds.value = new Set()
 
+    // Capture the symbol we are loading so we can detect if the user switched away.
+    const requestedSymbol = payload.symbol
+
     try {
       const data = await fetchGraphRoot(payload)
+
+      // A newer symbol was activated while this request was in-flight — discard.
+      if (symbol.value !== requestedSymbol) {
+        loading.value = false
+        return
+      }
+
       const pruned = pruneGraphToRoot(data.rootId, data.nodes, data.edges)
       allNodes.value = pruned.nodes
       allEdges.value = pruned.edges
@@ -360,11 +397,13 @@ export function useFlowGraph(cache: ReturnType<typeof useFlowGraphCache>) {
       void enrichNodes(visibleIds, { background: false, priorityVisible: true })
       maintainSilentBuffer()
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to load graph'
-      allNodes.value = []
-      allEdges.value = []
-      nodes.value = []
-      edges.value = []
+      if (symbol.value === requestedSymbol) {
+        error.value = err instanceof Error ? err.message : 'Failed to load graph'
+        allNodes.value = []
+        allEdges.value = []
+        nodes.value = []
+        edges.value = []
+      }
       loading.value = false
     }
   }
