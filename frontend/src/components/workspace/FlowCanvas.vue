@@ -362,8 +362,9 @@ function openDeepDive(): void {
           <div
             class="steps-panel flex shrink-0 flex-col border-r border-slate-800 bg-slate-900/40"
             :class="tracePanelOpen ? 'steps-panel-open' : 'steps-panel-closed'"
-            :style="tracePanelOpen ? { width: `${traceWidth}px` } : {}"
+            :style="tracePanelOpen ? { width: `${traceWidth}px` } : { width: '2.75rem' }"
           >
+            <template v-if="tracePanelOpen">
               <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-2 py-1.5">
                 <span class="text-xs font-semibold uppercase tracking-wide text-slate-400">Steps</span>
                 <button
@@ -441,6 +442,19 @@ function openDeepDive(): void {
                   </button>
                 </li>
               </ol>
+            </template>
+
+            <div v-else class="flex h-full justify-center pt-2">
+              <button
+                type="button"
+                class="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                aria-label="Show steps panel"
+                title="Show steps"
+                @click="toggleTracePanel"
+              >
+                <svg class="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2l4 4-4 4"/></svg>
+              </button>
+            </div>
           </div>
 
           <ResizeHandle
@@ -495,8 +509,9 @@ function openDeepDive(): void {
     <aside
       class="detail-panel flex shrink-0 flex-col border-l border-slate-800 bg-slate-900"
       :class="hasDetailContent && detailPanelOpen ? 'detail-panel-open' : 'detail-panel-closed'"
-      :style="hasDetailContent && detailPanelOpen ? { width: `${detailWidth}px` } : {}"
+      :style="hasDetailContent && detailPanelOpen ? { width: `${detailWidth}px` } : { width: '2.75rem' }"
     >
+      <template v-if="hasDetailContent && detailPanelOpen">
         <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-3 py-2">
           <span class="text-xs font-semibold uppercase tracking-wide text-slate-400">Details</span>
           <button
@@ -510,128 +525,171 @@ function openDeepDive(): void {
           </button>
         </div>
         <div v-if="selectedNode" class="min-h-0 flex-1 overflow-y-auto p-4">
-        <h3 class="text-lg font-semibold text-white">{{ nodeDisplayTitle(selectedNode) }}</h3>
+          <h3 class="text-lg font-semibold text-white">{{ nodeDisplayTitle(selectedNode) }}</h3>
 
-        <section class="mt-3">
-          <span class="inline-block rounded bg-green-900/40 px-2 py-0.5 text-xs font-bold uppercase text-green-400">
-            verified structure
-          </span>
-          <span class="ml-1 inline-block rounded border border-slate-700 px-2 py-0.5 text-xs uppercase text-slate-400">
-            {{ selectedNode.kind }}
-          </span>
-          <pre
-            v-if="selectedNode.code"
-            class="mt-2 overflow-x-auto rounded border border-slate-800 bg-slate-950 p-3 font-mono text-sm leading-relaxed text-slate-200"
-          >{{ selectedNode.code }}</pre>
-          <p v-else class="mt-2 text-sm text-slate-500">No source snippet for this step.</p>
-        </section>
-
-        <section v-if="showEnrichedSummary && enrichedBadge" class="mt-4">
-          <span
-            class="inline-block rounded px-2 py-0.5 text-xs font-bold uppercase"
-            :class="
-              selectedNode.labelSource === 'ai'
-                ? 'border border-dashed border-amber-600/50 bg-amber-900/20 text-amber-400'
-                : 'border border-dashed border-cyan-600/50 bg-cyan-900/20 text-cyan-400'
-            "
-          >
-            {{ enrichedBadge }}
-          </span>
-          <p
-            class="mt-2 text-sm leading-relaxed"
-            :class="selectedNode.labelSource === 'ai' ? 'text-amber-300/90' : 'text-cyan-300/90'"
-          >
-            {{ selectedNode.summary }}
-          </p>
-        </section>
-
-        <section class="mt-4">
-          <button
-            v-if="!deepDiveOpen"
-            type="button"
-            class="w-full rounded-md border border-slate-700 px-3 py-2.5 text-left text-sm text-slate-300 transition hover:border-onbober-primary/50 hover:text-white"
-            @click="openDeepDive"
-          >
-            Explain this step
-          </button>
-          <template v-else>
-            <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-2 py-0.5 text-xs font-bold uppercase text-amber-400">
-              Deep dive
+          <section class="mt-3">
+            <span class="inline-block rounded bg-green-900/40 px-2 py-0.5 text-xs font-bold uppercase text-green-400">
+              verified structure
             </span>
-            <LoadingStatus
-              class="mt-3"
-              :active="showDetailLoading"
-              :phrases="AI_LOADING_PHRASES"
-            />
-            <p v-if="detailError" class="mt-2 text-sm text-red-400">{{ detailError }}</p>
-            <p v-if="detail?.mock" class="mt-2 rounded border border-amber-800/50 bg-amber-900/20 px-2 py-1 text-xs text-amber-300">
-              Watsonx explanation unavailable
+            <span class="ml-1 inline-block rounded border border-slate-700 px-2 py-0.5 text-xs uppercase text-slate-400">
+              {{ selectedNode.kind }}
+            </span>
+            <pre
+              v-if="selectedNode.code"
+              class="mt-2 overflow-x-auto rounded border border-slate-800 bg-slate-950 p-3 font-mono text-sm leading-relaxed text-slate-200"
+            >{{ selectedNode.code }}</pre>
+            <p v-else class="mt-2 text-sm text-slate-500">No source snippet for this step.</p>
+          </section>
+
+          <section v-if="showEnrichedSummary && enrichedBadge" class="mt-4">
+            <span
+              class="inline-block rounded px-2 py-0.5 text-xs font-bold uppercase"
+              :class="
+                selectedNode.labelSource === 'ai'
+                  ? 'border border-dashed border-amber-600/50 bg-amber-900/20 text-amber-400'
+                  : 'border border-dashed border-cyan-600/50 bg-cyan-900/20 text-cyan-400'
+              "
+            >
+              {{ enrichedBadge }}
+            </span>
+            <p
+              class="mt-2 text-sm leading-relaxed"
+              :class="selectedNode.labelSource === 'ai' ? 'text-amber-300/90' : 'text-cyan-300/90'"
+            >
+              {{ selectedNode.summary }}
             </p>
+          </section>
 
-            <div v-if="verifiedExplanation || (!detailStreaming && detail?.explanation && !inferredExplanation)" class="mt-3">
-              <span class="inline-block rounded bg-green-900/40 px-2 py-0.5 text-xs font-bold uppercase text-green-400">
-                Verified
-              </span>
-              <MarkdownView :content="verifiedExplanation || detail?.explanation || ''" class="mt-2" />
-              <span v-if="detailStreaming && !inferredExplanation" class="inline-block w-1.5 animate-pulse bg-onbober-primary">|</span>
-            </div>
-
-            <div v-if="inferredExplanation" class="mt-4">
+          <section class="mt-4">
+            <button
+              v-if="!deepDiveOpen"
+              type="button"
+              class="w-full rounded-md border border-slate-700 px-3 py-2.5 text-left text-sm text-slate-300 transition hover:border-onbober-primary/50 hover:text-white"
+              @click="openDeepDive"
+            >
+              Explain this step
+            </button>
+            <template v-else>
               <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-2 py-0.5 text-xs font-bold uppercase text-amber-400">
-                Inferred
+                Deep dive
+            </span>
+            <span class="ml-1 inline-block rounded border border-slate-700 px-2 py-0.5 text-xs uppercase text-slate-400">
+              {{ selectedNode.kind }}
+            </span>
+            <pre
+              v-if="selectedNode.code"
+              class="mt-2 overflow-x-auto rounded border border-slate-800 bg-slate-950 p-3 font-mono text-sm leading-relaxed text-slate-200"
+            >{{ selectedNode.code }}</pre>
+            <p v-else class="mt-2 text-sm text-slate-500">No source snippet for this step.</p>
+          </section>
+
+          <section v-if="showAiSummary" class="mt-4">
+            <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-2 py-0.5 text-xs font-bold uppercase text-amber-400">
+              AI label
+            </span>
+            <p class="mt-2 text-sm leading-relaxed text-amber-300/90">{{ selectedNode.summary }}</p>
+          </section>
+
+          <section class="mt-4">
+            <button
+              v-if="!deepDiveOpen"
+              type="button"
+              class="w-full rounded-md border border-slate-700 px-3 py-2.5 text-left text-sm text-slate-300 transition hover:border-onbober-primary/50 hover:text-white"
+              @click="openDeepDive"
+            >
+              Explain this step
+            </button>
+            <template v-else>
+              <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-2 py-0.5 text-xs font-bold uppercase text-amber-400">
+                Deep dive
               </span>
-              <p class="mt-1 text-xs text-slate-400">Based on codebase patterns — not verified against external API docs.</p>
-              <MarkdownView :content="inferredExplanation" class="mt-2 [&_.md-prose]:text-amber-300/90" />
-              <span v-if="detailStreaming" class="inline-block w-1.5 animate-pulse bg-onbober-primary">|</span>
-            </div>
+              <LoadingStatus
+                class="mt-3"
+                :active="showDetailLoading"
+                :phrases="AI_LOADING_PHRASES"
+              />
+              <p v-if="detailError" class="mt-2 text-sm text-red-400">{{ detailError }}</p>
+              <p v-if="detail?.mock" class="mt-2 rounded border border-amber-800/50 bg-amber-900/20 px-2 py-1 text-xs text-amber-300">
+                Watsonx explanation unavailable
+              </p>
 
-            <div v-if="hasEvidence" class="mt-4">
-              <button
-                type="button"
-                class="text-left text-sm text-slate-400 hover:text-slate-200"
-                @click="evidenceOpen = !evidenceOpen"
-              >
-                {{ evidenceOpen ? 'Hide' : 'Show' }} evidence used ({{ detail?.evidence?.length }})
-              </button>
-              <ul v-if="evidenceOpen" class="mt-2 space-y-1">
-                <li
-                  v-for="(line, idx) in detail?.evidence"
-                  :key="idx"
-                  class="truncate font-mono text-xs text-slate-400"
-                  :title="line"
+              <div v-if="verifiedExplanation || (!detailStreaming && detail?.explanation && !inferredExplanation)" class="mt-3">
+                <span class="inline-block rounded bg-green-900/40 px-2 py-0.5 text-xs font-bold uppercase text-green-400">
+                  Verified
+                </span>
+                <MarkdownView :content="verifiedExplanation || detail?.explanation || ''" class="mt-2" />
+                <span v-if="detailStreaming && !inferredExplanation" class="inline-block w-1.5 animate-pulse bg-onbober-primary">|</span>
+              </div>
+
+              <div v-if="inferredExplanation" class="mt-4">
+                <span class="inline-block rounded border border-dashed border-amber-600/50 bg-amber-900/20 px-2 py-0.5 text-xs font-bold uppercase text-amber-400">
+                  Inferred
+                </span>
+                <p class="mt-1 text-xs text-slate-400">Based on codebase patterns — not verified against external API docs.</p>
+                <MarkdownView :content="inferredExplanation" class="mt-2 [&_.md-prose]:text-amber-300/90" />
+                <span v-if="detailStreaming" class="inline-block w-1.5 animate-pulse bg-onbober-primary">|</span>
+              </div>
+
+              <div v-if="hasEvidence" class="mt-4">
+                <button
+                  type="button"
+                  class="text-left text-sm text-slate-400 hover:text-slate-200"
+                  @click="evidenceOpen = !evidenceOpen"
                 >
-                  {{ line }}
-                </li>
-              </ul>
-            </div>
-          </template>
-        </section>
+                  {{ evidenceOpen ? 'Hide' : 'Show' }} evidence used ({{ detail?.evidence?.length }})
+                </button>
+                <ul v-if="evidenceOpen" class="mt-2 space-y-1">
+                  <li
+                    v-for="(line, idx) in detail?.evidence"
+                    :key="idx"
+                    class="truncate font-mono text-xs text-slate-400"
+                    :title="line"
+                  >
+                    {{ line }}
+                  </li>
+                </ul>
+              </div>
+            </template>
+          </section>
 
-        <p
-          v-if="!fullyExpanded && hasHiddenChildren(selectedNode.id)"
-          class="mt-3 text-sm text-onbober-primary"
-        >
-          Click again to reveal the next step{{ selectedNode.kind === 'branch' ? 's (branches)' : '' }}.
-        </p>
+          <p
+            v-if="!fullyExpanded && hasHiddenChildren(selectedNode.id)"
+            class="mt-3 text-sm text-onbober-primary"
+          >
+            Click again to reveal the next step{{ selectedNode.kind === 'branch' ? 's (branches)' : '' }}.
+          </p>
 
-        <div class="mt-4 flex flex-col gap-2">
-          <button
-            v-if="selectedNode.calleeFile"
-            type="button"
-            class="text-left text-sm text-onbober-primary hover:underline"
-            @click="emit('goToDefinition', selectedNode.calleeFile!, selectedNode.calleeSymbol ?? selectedNode.label, selectedNode.calleeLine ?? 1)"
-          >
-            Go to {{ selectedNode.calleeSymbol }} ({{ selectedNode.calleeFile }}:{{ selectedNode.calleeLine }})
-          </button>
-          <button
-            v-if="selectedNode.file || detail?.file"
-            type="button"
-            class="text-left text-sm text-slate-400 hover:text-onbober-primary hover:underline"
-            @click="emit('viewSource', selectedNode.file ?? detail?.file, selectedNode.line ?? undefined)"
-          >
-            View source{{ selectedNode.line ? ` (line ${selectedNode.line})` : '' }}
-          </button>
+          <div class="mt-4 flex flex-col gap-2">
+            <button
+              v-if="selectedNode.calleeFile"
+              type="button"
+              class="text-left text-sm text-onbober-primary hover:underline"
+              @click="emit('goToDefinition', selectedNode.calleeFile!, selectedNode.calleeSymbol ?? selectedNode.label, selectedNode.calleeLine ?? 1)"
+            >
+              Go to {{ selectedNode.calleeSymbol }} ({{ selectedNode.calleeFile }}:{{ selectedNode.calleeLine }})
+            </button>
+            <button
+              v-if="selectedNode.file || detail?.file"
+              type="button"
+              class="text-left text-sm text-slate-400 hover:text-onbober-primary hover:underline"
+              @click="emit('viewSource', selectedNode.file ?? detail?.file, selectedNode.line ?? undefined)"
+            >
+              View source{{ selectedNode.line ? ` (line ${selectedNode.line})` : '' }}
+            </button>
+          </div>
         </div>
+      </template>
+
+      <div v-else class="flex h-full justify-center pt-2">
+        <button
+          type="button"
+          class="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition hover:bg-slate-800 hover:text-white"
+          aria-label="Show details panel"
+          title="Show details"
+          @click="toggleDetailPanel"
+        >
+          <svg class="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2l4 4-4 4"/></svg>
+        </button>
       </div>
     </aside>
   </div>
@@ -644,9 +702,10 @@ function openDeepDive(): void {
   transition: width 0.22s ease, opacity 0.22s ease;
 }
 .steps-panel-closed {
-  width: 0 !important;
-  opacity: 0;
-  pointer-events: none;
+  width: 2.75rem !important;
+  min-width: 2.75rem;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* Details panel: animate width from the right */
@@ -655,9 +714,10 @@ function openDeepDive(): void {
   transition: width 0.22s ease, opacity 0.22s ease;
 }
 .detail-panel-closed {
-  width: 0 !important;
-  opacity: 0;
-  pointer-events: none;
+  width: 2.75rem !important;
+  min-width: 2.75rem;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .mermaid-flow :deep(svg) {
