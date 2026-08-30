@@ -9,10 +9,12 @@ export type ExperienceLevel = 'junior' | 'mid' | 'senior'
  * Developer context collected during onboarding and sent to the backend.
  */
 export interface UserContext {
-  /** Primary programming language the developer is most comfortable with. */
+  /** Comma-separated backend-safe language values from onboarding. */
   primaryLanguage: string
   /** Self-reported experience level. */
   experienceLevel: ExperienceLevel
+  /** When true, AI labels and explanations may include brief analogies to familiar languages. */
+  languageComparisons: boolean
   /** Absolute path to the local codebase workspace. */
   workspaceId: string
   workspaceName: string
@@ -23,6 +25,7 @@ const STORAGE_KEY = 'onbober:user-context'
 const defaultContext: UserContext = {
   primaryLanguage: '',
   experienceLevel: 'junior',
+  languageComparisons: false,
   workspaceId: '',
   workspaceName: '',
 }
@@ -45,7 +48,11 @@ function loadFromStorage(): UserContext {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...defaultContext }
-    return { ...defaultContext, ...JSON.parse(raw) }
+    const parsed = { ...defaultContext, ...JSON.parse(raw) } as UserContext
+    if (typeof parsed.languageComparisons !== 'boolean') {
+      parsed.languageComparisons = false
+    }
+    return parsed
   } catch {
     return { ...defaultContext }
   }
@@ -96,6 +103,19 @@ const LANG_ALIASES: Record<string, string> = {
 }
 const VALID_LANGS = new Set(['auto', 'c', 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'rust', 'typescript'])
 
+const LANG_DISPLAY: Record<string, string> = {
+  auto: 'Auto',
+  c: 'C',
+  cpp: 'C++',
+  csharp: 'C#',
+  go: 'Go',
+  java: 'Java',
+  javascript: 'JavaScript',
+  python: 'Python',
+  rust: 'Rust',
+  typescript: 'TypeScript',
+}
+
 function normalizeSingle(lang: string): string {
   const key = lang.toLowerCase().trim()
   if (VALID_LANGS.has(key)) return key
@@ -113,4 +133,26 @@ function normalizeSingle(lang: string): string {
 export function normalizeLanguage(lang: string): string {
   const candidates = lang.split(',').map((s) => normalizeSingle(s.trim()))
   return candidates.find((v) => v !== 'auto') ?? 'auto'
+}
+
+/**
+ * Human-readable names for languages stored in primaryLanguage (comma-separated).
+ */
+export function familiarLanguageNames(primaryLanguage: string): string[] {
+  const names: string[] = []
+  const seen = new Set<string>()
+  for (const part of primaryLanguage.split(',')) {
+    const key = normalizeSingle(part.trim())
+    if (key === 'auto') continue
+    const label = LANG_DISPLAY[key] ?? key
+    if (!seen.has(label)) {
+      seen.add(label)
+      names.push(label)
+    }
+  }
+  return names
+}
+
+export function hasFamiliarLanguages(primaryLanguage: string): boolean {
+  return familiarLanguageNames(primaryLanguage).length > 0
 }

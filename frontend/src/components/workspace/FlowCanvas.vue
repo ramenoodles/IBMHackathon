@@ -14,7 +14,7 @@ import { useWorkspaceLayout } from '@/composables/useWorkspaceLayout'
 import ResizeHandle from '@/components/ui/ResizeHandle.vue'
 import { AI_LOADING_PHRASES } from '@/constants/aiLoadingPhrases'
 import { edgeOrder } from '@/utils/flowGraphUtils'
-import { hasEnrichedLabel, isCompactNode, labelSourceBadge, labelSourcePill } from '@/utils/flowGraphLabels'
+import { canPreviewCalleeFlow, hasEnrichedLabel, isCompactNode, labelSourceBadge, labelSourcePill } from '@/utils/flowGraphLabels'
 
 const {
   tracePanelOpen,
@@ -437,7 +437,7 @@ function openDeepDive(): void {
                         Expand
                       </button>
                       <button
-                        v-if="isCompactNode(node)"
+                        v-if="canPreviewCalleeFlow(node)"
                         type="button"
                         class="flex shrink-0 items-center gap-1 rounded p-0.5 text-onbober-primary hover:bg-onbober-primary/10"
                         title="View code flow (scan labels)"
@@ -557,16 +557,21 @@ function openDeepDive(): void {
             >{{ selectedNode.code }}</pre>
             <p v-else class="mt-2 text-sm text-slate-500">No source snippet for this step.</p>
             <p
-              v-if="isCompactNode(selectedNode)"
+              v-if="canPreviewCalleeFlow(selectedNode)"
               class="mt-3 text-sm leading-relaxed text-slate-400"
             >
-              This step is folded. Use <strong class="font-medium text-slate-300">View code flow</strong> to see the full callee graph with scan labels, or <strong class="font-medium text-slate-300">Expand inline</strong> to unfold it in the main diagram.
+              <template v-if="isCompactNode(selectedNode)">
+                This step is folded. Use <strong class="font-medium text-slate-300">View code flow</strong> to see the full callee graph with scan labels, or <strong class="font-medium text-slate-300">Expand inline</strong> to unfold it in the main diagram.
+              </template>
+              <template v-else>
+                Use <strong class="font-medium text-slate-300">View code flow</strong> to open the callee graph with scan labels.
+              </template>
             </p>
           </section>
 
           <section v-if="showEnrichedSummary && enrichedBadge" class="mt-4">
             <span
-              class="inline-block rounded px-2 py-0.5 text-xs font-bold uppercase"
+              class="inline-block rounded px-2 py-0.5 text-xs font-bold"
               :class="
                 selectedNode.labelSource === 'ai'
                   ? 'border border-dashed border-amber-600/50 bg-amber-900/20 text-amber-400'
@@ -654,7 +659,7 @@ function openDeepDive(): void {
 
           <div class="mt-4 flex flex-col gap-2">
             <button
-              v-if="selectedNode && isCompactNode(selectedNode)"
+              v-if="selectedNode && canPreviewCalleeFlow(selectedNode)"
               type="button"
               class="w-full rounded-md border border-onbober-primary/40 bg-onbober-primary/5 px-3 py-2.5 text-left text-sm font-medium text-onbober-primary transition hover:border-onbober-primary/60 hover:bg-onbober-primary/10"
               @click="emit('previewCompacted', selectedNode)"

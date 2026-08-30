@@ -18,7 +18,7 @@ export function labelSourceBadge(source?: LabelSource): string | null {
     case 'heuristic':
       return 'Auto label'
     case 'ai':
-      return 'AI label'
+      return 'Brief'
     default:
       return null
   }
@@ -32,4 +32,9 @@ export function hasEnrichedLabel(node: FlowNode): boolean {
 /** Callee folded into one compact node — previewable without inline expand. */
 export function isCompactNode(node: FlowNode): boolean {
   return node.collapsed && node.expandable && Boolean(node.calleeFile && node.calleeSymbol)
+}
+
+/** Whether the callee's flow graph can be opened in the scan-only preview modal. */
+export function canPreviewCalleeFlow(node: FlowNode): boolean {
+  return Boolean(node.calleeFile && node.calleeSymbol)
 }

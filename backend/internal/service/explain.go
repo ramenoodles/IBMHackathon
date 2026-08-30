@@ -19,12 +19,14 @@ type ExplainRequest struct {
 	Before   int
 	After    int
 	// Node context forwarded from the UI.
-	File       string
-	Line       int
-	Code       string // exact snippet shown in the graph node
-	Kind       string // entry / call / branch / return / raise
-	Title      string // display label (e.g. "strip()")
-	Experience string // junior / mid / senior
+	File                string
+	Line                int
+	Code                string // exact snippet shown in the graph node
+	Kind                string // entry / call / branch / return / raise
+	Title               string // display label (e.g. "strip()")
+	Experience          string // junior / mid / senior
+	FamiliarLanguages   string // comma-separated human-readable language names
+	LanguageComparisons bool
 }
 
 type ExplainResult struct {
@@ -86,6 +88,12 @@ func buildQuestion(req ExplainRequest) string {
 		b.WriteString("\n\nIn 1–2 sentences, explain the intent of this step and any non-obvious edge case.")
 	default:
 		b.WriteString("\n\nIn 2–3 sentences, explain what this step does and why it matters. Do not describe the rest of the file.")
+	}
+
+	if req.LanguageComparisons && strings.TrimSpace(req.FamiliarLanguages) != "" {
+		b.WriteString("\nIf helpful, end with one brief analogy to ")
+		b.WriteString(strings.TrimSpace(req.FamiliarLanguages))
+		b.WriteString(" (max one short sentence). Skip if no clear parallel exists.")
 	}
 
 	return b.String()

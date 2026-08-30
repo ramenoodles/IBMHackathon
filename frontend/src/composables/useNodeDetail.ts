@@ -15,10 +15,12 @@ export interface NodeDetailParams {
   summary?: string
   experience?: string
   language?: string
+  languageComparisons?: boolean
+  familiarLanguages?: string
 }
 
 function cacheKey(params: NodeDetailParams): string {
-  return `${params.file ?? ''}::${params.symbol}::${params.nodeId}::${params.experience ?? ''}`
+  return `${params.file ?? ''}::${params.symbol}::${params.nodeId}::${params.experience ?? ''}::${params.languageComparisons ? '1' : '0'}`
 }
 
 function buildQuery(params: NodeDetailParams): URLSearchParams {
@@ -114,6 +116,8 @@ export function useNodeDetail() {
         kind: params.kind,
         title: params.title,
         experience: params.experience,
+        languageComparisons: params.languageComparisons,
+        familiarLanguages: params.familiarLanguages,
       }, signal)
       detail.value = { ...detail.value, ...parsed, id: params.nodeId, title: params.title ?? params.nodeId, summary: params.summary ?? '' }
       setCached(params, detail.value)
@@ -139,6 +143,8 @@ export function useNodeDetail() {
       kind: params.kind,
       title: params.title,
       experience: params.experience,
+      languageComparisons: params.languageComparisons,
+      familiarLanguages: params.familiarLanguages,
     }, signal)
 
     const reader = res.body?.getReader()

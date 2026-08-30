@@ -18,8 +18,9 @@ type EnrichNodeInput struct {
 }
 
 type EnrichUserContext struct {
-	PrimaryLanguage string `json:"primaryLanguage"`
-	ExperienceLevel string `json:"experienceLevel"`
+	PrimaryLanguage     string `json:"primaryLanguage"`
+	ExperienceLevel     string `json:"experienceLevel"`
+	LanguageComparisons bool   `json:"languageComparisons"`
 }
 
 type EnrichRequest struct {
@@ -180,6 +181,15 @@ func buildEnrichPrompt(req EnrichRequest, nodes []EnrichNodeInput) string {
 		b.WriteString("Audience: senior developer — focus on intent and non-obvious behavior.\n")
 	default:
 		b.WriteString("Audience: developer new to this codebase.\n")
+	}
+
+	if req.UserContext.LanguageComparisons {
+		if lang := strings.TrimSpace(req.UserContext.PrimaryLanguage); lang != "" {
+			b.WriteString("Familiar languages: ")
+			b.WriteString(lang)
+			b.WriteString("\n")
+		}
+		b.WriteString("When a step uses an idiom with a clear analogue in one of those familiar languages, you may add a brief comparison phrase to the summary (e.g. \"like a Python threading.Lock\"). Keep it to one short clause; skip if no useful analogy exists.\n")
 	}
 
 	b.WriteString("\nFor each node, produce:\n")
