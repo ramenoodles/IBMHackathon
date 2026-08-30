@@ -82,7 +82,7 @@ const panContent = ref<HTMLElement | null>(null)
 const deepDiveOpen = ref(false)
 const evidenceOpen = ref(false)
 
-const { bind: bindPanZoom, unbind: unbindPanZoom, zoomIn, zoomOut, fitToView } = useFlowPanZoom(
+const { bind: bindPanZoom, unbind: unbindPanZoom, zoomIn, zoomOut, fitToView, centerView, isFitted } = useFlowPanZoom(
   panViewport,
   panContent,
 )
@@ -106,7 +106,9 @@ const { renderError, setContainer } = useFlowMermaid(
   () => {
     void nextTick(() => {
       bindPanZoom()
-      fitToView()
+      isFitted.value = false
+      // Default view on each new chart: centred on the top node at current scale
+      centerView()
     })
   },
 )
@@ -273,11 +275,20 @@ const showExpandHint = computed(
               </button>
               <button
                 type="button"
-                class="rounded px-1.5 py-0.5 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-white"
-                title="Fit to view"
+                class="rounded px-1.5 py-0.5 text-[10px] transition"
+                :class="isFitted ? 'text-onbober-primary' : 'text-slate-400 hover:bg-slate-800 hover:text-white'"
+                title="Fit to screen"
                 @click="fitToView"
               >
                 Fit
+              </button>
+              <button
+                type="button"
+                class="rounded px-1.5 py-0.5 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-white"
+                title="Centre view"
+                @click="centerView"
+              >
+                ⊙
               </button>
               <button
                 type="button"
