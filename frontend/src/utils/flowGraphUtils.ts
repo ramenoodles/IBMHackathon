@@ -28,6 +28,7 @@ export interface SymbolFlowState {
 
 export const LARGE_FILE_SYMBOL_THRESHOLD = 8
 export const DEFAULT_WARM_SELECTION = 8
+export const SYMBOL_PAGE_SIZE = 8
 export const WARM_CONCURRENCY = 3
 export const INITIAL_VISIBLE_COUNT = 1
 export const SILENT_BUFFER_STEPS = 2

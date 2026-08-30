@@ -20,6 +20,7 @@ import { useSymbolBrief } from '@/composables/useSymbolBrief'
 import { useFileFlowWarm } from '@/composables/useFileFlowWarm'
 import { useNodeDetail } from '@/composables/useNodeDetail'
 import { userContext } from '@/store/userContext'
+import { SYMBOL_PAGE_SIZE } from '@/utils/flowGraphUtils'
 import type { FlowNode } from '@/types/flowGraph'
 
 type WorkspacePhase = 'idle' | 'brief' | 'warming' | 'tracing'
@@ -67,8 +68,14 @@ const {
   reset: resetGraph,
 } = useFlowGraph(graphCache)
 
-const { symbols, loading: symbolsLoading, error: symbolsError, isLargeFile, load: loadSymbols, reset: resetSymbols } =
-  useSymbolBrief()
+const {
+  symbols,
+  loading: symbolsLoading,
+  error: symbolsError,
+  isLargeFile,
+  load: loadSymbols,
+  reset: resetSymbols,
+} = useSymbolBrief()
 const { warming, progress, warmFile } = useFileFlowWarm(graphCache)
 const { detail, loading: detailLoading, streaming: detailStreaming, error: detailError, loadDetail, clear: clearDetail } = useNodeDetail()
 
@@ -79,6 +86,7 @@ const selectedNodeId = ref('')
 const sourceOpen = ref(false)
 const sourcePath = ref('')
 const warmedSymbolNames = ref<string[]>([])
+const symbolBarPage = ref(0)
 
 const branchPromptOpen = ref(false)
 const branchNode = ref<FlowNode | null>(null)
@@ -89,10 +97,34 @@ const showSymbolBar = computed(
     (workspacePhase.value === 'tracing' || workspacePhase.value === 'warming'),
 )
 
-const symbolBarNames = computed(() => {
+const symbolBarSource = computed(() => {
   if (warmedSymbolNames.value.length) return warmedSymbolNames.value
   return symbols.value.map((s) => s.name)
 })
+
+const symbolBarTotalPages = computed(() =>
+  Math.max(1, Math.ceil(symbolBarSource.value.length / SYMBOL_PAGE_SIZE)),
+)
+
+const symbolBarNames = computed(() => {
+  const start = symbolBarPage.value * SYMBOL_PAGE_SIZE
+  return symbolBarSource.value.slice(start, start + SYMBOL_PAGE_SIZE)
+})
+
+const symbolBarHasNext = computed(() => symbolBarPage.value < symbolBarTotalPages.value - 1)
+const symbolBarHasPrev = computed(() => symbolBarPage.value > 0)
+
+function symbolBarGoToPage(n: number): void {
+  symbolBarPage.value = Math.max(0, Math.min(n, symbolBarTotalPages.value - 1))
+}
+
+function symbolBarAdvancePage(): void {
+  if (symbolBarHasNext.value) symbolBarGoToPage(symbolBarPage.value + 1)
+}
+
+function symbolBarPrevPage(): void {
+  if (symbolBarHasPrev.value) symbolBarGoToPage(symbolBarPage.value - 1)
+}
 
 function graphPayload() {
   return {
@@ -109,6 +141,8 @@ async function onSelectFile(path: string): Promise<void> {
   selectedNodeId.value = ''
   clearDetail()
   warmedSymbolNames.value = []
+  symbolBarPage.value = 0
+  resetSymbols()
   resetGraph()
 
   if (graphCache.isFileWarmed(path)) {
@@ -278,7 +312,14 @@ function fileName(): string {
           :file-path="selectedPath"
           :active-symbol="symbol"
           :symbol-names="symbolBarNames"
+          :has-next-page="symbolBarHasNext"
+          :has-prev-page="symbolBarHasPrev"
+          :current-page="symbolBarPage"
+          :total-pages="symbolBarTotalPages"
           @pick="onPickSymbol"
+          @next-page="symbolBarAdvancePage"
+          @prev-page="symbolBarPrevPage"
+          @go-to-page="symbolBarGoToPage"
         />
 
         <FileFlowBrief
