@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+    expose:
+      - "8080"
+    networks:
+      - onbober
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - onbober
+
+networks:
+  onbober:

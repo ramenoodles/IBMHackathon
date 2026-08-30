@@ -1,0 +1,5 @@
+.env
+*.md
+.gitea/
+.vscode/
+.git/
