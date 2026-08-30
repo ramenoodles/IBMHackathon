@@ -221,8 +221,9 @@ const showExpandHint = computed(
         <p class="max-w-sm text-sm text-slate-500">Select a file, then choose a function from the bar above.</p>
       </div>
 
-      <div v-else-if="!nodes.length" class="flex flex-1 items-center justify-center text-sm text-slate-500">
-        No flow data for <span class="ml-1 font-mono text-onbober-primary">{{ symbol }}</span>
+      <div v-else-if="!nodes.length" class="flex flex-1 flex-col items-center justify-center gap-1 text-center text-sm text-slate-500">
+        <span>No flow data for: <span class="font-mono text-onbober-primary">{{ symbol }}</span></span>
+        <span class="text-xs text-slate-600">This is not an error. This function is isolated, it has no calls to or from other functions.</span>
       </div>
 
       <template v-else>
