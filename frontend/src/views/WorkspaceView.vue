@@ -3,6 +3,7 @@
  * Clean graph-first workspace: explorer + timeline + on-demand source modal.
  */
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import Sidebar from '@/components/workspace/Sidebar.vue'
 import SymbolBar from '@/components/workspace/SymbolBar.vue'
 import FlowCanvas from '@/components/workspace/FlowCanvas.vue'
@@ -91,6 +92,9 @@ const sourcePath = ref('')
 
 const branchPromptOpen = ref(false)
 const branchNode = ref<FlowNode | null>(null)
+
+const router = useRouter()
+const leaveConfirmOpen = ref(false)
 
 const showSymbolBar = computed(
   () => selectedPath.value && workspacePhase.value === 'tracing',
@@ -211,9 +215,14 @@ function fileName(): string {
       >
         ☰
       </button>
-      <span class="text-sm font-semibold text-slate-200">
-        On<span class="text-onbober-primary">Bober</span>
-      </span>
+      <button
+        type="button"
+        class="cursor-pointer transition-opacity hover:opacity-70"
+        title="Go home"
+        @click="leaveConfirmOpen = true"
+      >
+        <img src="@/assets/dark_headline.png" alt="OnBober" class="h-6 w-auto" />
+      </button>
       <span v-if="selectedPath" class="truncate text-xs text-slate-500">
         {{ fileName() }}
       </span>
@@ -311,6 +320,26 @@ function fileName(): string {
         </div>
       </div>
     </div>
+
+    <Modal :open="leaveConfirmOpen" title="Leave workspace?" @close="leaveConfirmOpen = false">
+      <p class="mb-5 text-sm text-slate-300">Are you sure you would like to leave the workspace?</p>
+      <div class="flex justify-end gap-2">
+        <button
+          type="button"
+          class="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-300 transition hover:border-slate-500 hover:text-white"
+          @click="leaveConfirmOpen = false"
+        >
+          Return to workspace
+        </button>
+        <button
+          type="button"
+          class="rounded-md bg-onbober-primary px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+          @click="router.push('/')"
+        >
+          Yes, go home
+        </button>
+      </div>
+    </Modal>
 
     <Modal :open="sourceOpen" title="Source" @close="sourceOpen = false">
       <div class="max-h-[60vh] overflow-auto">
