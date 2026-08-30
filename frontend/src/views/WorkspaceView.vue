@@ -217,7 +217,9 @@ function fileName(): string {
         aria-label="Toggle files"
         @click="toggleSidebar"
       >
-        ☰
+        <svg class="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
+          <path d="M2 4h12M2 8h12M2 12h12" />
+        </svg>
       </button>
       <button
         type="button"
@@ -233,27 +235,14 @@ function fileName(): string {
     </header>
 
     <div class="flex min-h-0 flex-1">
-      <button
-        v-if="!sidebarOpen"
-        type="button"
-        class="flex w-8 shrink-0 flex-col items-center justify-center gap-1 border-r border-slate-800 bg-slate-900/80 text-slate-500 transition hover:bg-slate-800 hover:text-slate-200"
-        aria-label="Show file explorer"
-        title="Show files"
-        @click="toggleSidebar"
-      >
-        <span class="text-sm">›</span>
-        <span class="text-[9px] font-medium uppercase tracking-wide [writing-mode:vertical-rl]">Files</span>
-      </button>
-
       <Sidebar
-        v-show="sidebarOpen"
         :workspace-id="userContext.workspaceId"
         :selected-path="selectedPath"
+        :open="sidebarOpen"
         :width="explorerWidth"
         @select="onSelectFile"
         @toggle="toggleSidebar"
       />
-
       <ResizeHandle
         v-if="sidebarOpen && !isMobile"
         label="Resize file explorer"
@@ -262,7 +251,6 @@ function fileName(): string {
 
       <div class="relative flex min-w-0 flex-1 flex-col">
         <SymbolBar
-          v-if="showSymbolBar"
           :workspace-id="userContext.workspaceId"
           :file-path="selectedPath"
           :active-symbol="symbol"
@@ -271,57 +259,63 @@ function fileName(): string {
           :has-prev-page="symbolBarHasPrev"
           :current-page="symbolBarPage"
           :total-pages="symbolBarTotalPages"
+          :visible="showSymbolBar"
           @pick="onPickSymbol"
           @next-page="symbolBarAdvancePage"
           @prev-page="symbolBarPrevPage"
           @go-to-page="symbolBarGoToPage"
         />
 
-        <SymbolLoadPrompt
-          v-if="workspacePhase === 'brief' && selectedPath"
-          :file-name="fileName()"
-          :loading="symbolsLoading"
-          :error="symbolsError"
-          :symbol-count="symbols.length"
-          @confirm="onConfirmFlowInit"
-          @decline="onDeclineFlowInit"
-        />
+        <Transition name="fade" mode="out-in">
+          <SymbolLoadPrompt
+            v-if="workspacePhase === 'brief' && selectedPath"
+            key="brief"
+            :file-name="fileName()"
+            :loading="symbolsLoading"
+            :error="symbolsError"
+            :symbol-count="symbols.length"
+            @confirm="onConfirmFlowInit"
+            @decline="onDeclineFlowInit"
+          />
 
-        <FlowCanvas
-          v-else-if="workspacePhase === 'tracing'"
-          :nodes="nodes"
-          :edges="edges"
-          :root-id="rootId"
-          :loading="loading"
-          :enriching="enriching"
-          :expanding="expanding"
-          :mapping-full-flow="mappingFullFlow"
-          :fully-expanded="fullyExpanded"
-          :error="graphError"
-          :is-mock="isMock"
-          :symbol="symbol"
-          :selected-node-id="selectedNodeId"
-          :detail="detail"
-          :detail-loading="detailLoading"
-          :detail-streaming="detailStreaming"
-          :detail-error="detailError"
-          :has-hidden-children="hasHiddenChildren"
-          @select-node="onSelectNode"
-          @request-detail="onRequestDetail"
-          @reveal-node="onRevealNode"
-          @expand-node="onExpandNode"
-          @show-full-flow="onShowFullFlow"
-          @view-source="onViewSource()"
-          @go-to-definition="onGoToDefinition"
-        />
+          <FlowCanvas
+            v-else-if="workspacePhase === 'tracing'"
+            key="tracing"
+            :nodes="nodes"
+            :edges="edges"
+            :root-id="rootId"
+            :loading="loading"
+            :enriching="enriching"
+            :expanding="expanding"
+            :mapping-full-flow="mappingFullFlow"
+            :fully-expanded="fullyExpanded"
+            :error="graphError"
+            :is-mock="isMock"
+            :symbol="symbol"
+            :selected-node-id="selectedNodeId"
+            :detail="detail"
+            :detail-loading="detailLoading"
+            :detail-streaming="detailStreaming"
+            :detail-error="detailError"
+            :has-hidden-children="hasHiddenChildren"
+            @select-node="onSelectNode"
+            @request-detail="onRequestDetail"
+            @reveal-node="onRevealNode"
+            @expand-node="onExpandNode"
+            @show-full-flow="onShowFullFlow"
+            @view-source="onViewSource()"
+            @go-to-definition="onGoToDefinition"
+          />
 
-        <div
-          v-else-if="workspacePhase !== 'brief'"
-          class="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-slate-500"
-        >
-          <p class="text-lg font-medium text-slate-300">Select a file to begin</p>
-          <p class="max-w-sm text-sm">Choose a file from the explorer to see traceable symbols.</p>
-        </div>
+          <div
+            v-else
+            key="idle"
+            class="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-slate-500"
+          >
+            <p class="text-lg font-medium text-slate-300">Select a file to begin</p>
+            <p class="max-w-sm text-sm">Choose a file from the explorer to see traceable symbols.</p>
+          </div>
+        </Transition>
       </div>
     </div>
 
@@ -364,3 +358,15 @@ function fileName(): string {
     />
   </div>
 </template>
+
+<style scoped>
+/* Phase content: simple fade */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

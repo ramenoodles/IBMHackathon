@@ -299,76 +299,64 @@ const showExpandHint = computed(
         <p v-if="error" class="shrink-0 px-4 py-2 text-sm text-red-400">{{ error }}</p>
 
         <div class="flex min-h-0 flex-1">
-          <button
-            v-if="!tracePanelOpen"
-            type="button"
-            class="flex w-8 shrink-0 flex-col items-center justify-center gap-1 border-r border-slate-800 bg-slate-900/60 text-slate-500 transition hover:bg-slate-800 hover:text-slate-200"
-            aria-label="Show steps panel"
-            title="Show steps"
-            @click="toggleTracePanel"
-          >
-            <span class="text-sm">›</span>
-            <span class="text-[9px] font-medium uppercase tracking-wide [writing-mode:vertical-rl]">Steps</span>
-          </button>
-
           <div
-            v-else
-            class="flex shrink-0 flex-col border-r border-slate-800 bg-slate-900/40"
-            :style="{ width: `${traceWidth}px` }"
+            class="steps-panel flex shrink-0 flex-col border-r border-slate-800 bg-slate-900/40"
+            :class="tracePanelOpen ? 'steps-panel-open' : 'steps-panel-closed'"
+            :style="tracePanelOpen ? { width: `${traceWidth}px` } : {}"
           >
-            <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-2 py-1.5">
-              <span class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Steps</span>
-              <button
-                type="button"
-                class="rounded px-1.5 py-0.5 text-slate-500 hover:bg-slate-800 hover:text-white"
-                aria-label="Hide steps panel"
-                title="Hide steps"
-                @click="toggleTracePanel"
-              >
-                ‹
-              </button>
-            </div>
-            <ol class="min-h-0 flex-1 overflow-y-auto p-2">
-              <li v-for="(node, i) in orderedNodes" :key="node.id" class="mb-1">
+              <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-2 py-1.5">
+                <span class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Steps</span>
                 <button
                   type="button"
-                  class="w-full rounded-md border px-2 py-1.5 text-left transition"
-                  :class="
-                    selectedNodeId === node.id
-                      ? 'border-onbober-primary/50 bg-onbober-primary/5'
-                      : 'border-transparent hover:border-slate-700 hover:bg-slate-800/50'
-                  "
-                  @click="onNodeClick(node)"
+                  class="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-white"
+                  aria-label="Hide steps panel"
+                  title="Hide steps"
+                  @click="toggleTracePanel"
                 >
-                  <div class="flex items-center gap-2">
-                    <span
-                      class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
-                      :class="
-                        selectedNodeId === node.id
-                          ? 'bg-onbober-primary text-white'
-                          : 'bg-slate-800 text-slate-400'
-                      "
-                    >
-                      {{ i + 1 }}
-                    </span>
-                    <span class="min-w-0 flex-1 truncate text-xs font-medium text-slate-200">
-                      {{ nodeDisplayTitle(node) }}
-                    </span>
-                    <span
-                      v-if="hasHiddenChildren(node.id)"
-                      class="shrink-0 rounded bg-onbober-primary/20 px-1 text-[9px] font-bold uppercase text-onbober-primary"
-                    >
-                      +
-                    </span>
-                    <span class="shrink-0 text-[10px] uppercase text-slate-600">{{ kindLabel(node.kind) }}</span>
-                  </div>
-                  <p v-if="node.summary && node.summary !== nodeDisplayTitle(node)" class="mt-1 text-xs text-slate-400">
-                    {{ node.summary }}
-                  </p>
-                  <p v-if="node.code" class="mt-0.5 truncate font-mono text-[10px] text-slate-600">{{ node.code }}</p>
+                  <svg class="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2L4 6l4 4"/></svg>
                 </button>
-              </li>
-            </ol>
+              </div>
+              <ol class="min-h-0 flex-1 overflow-y-auto p-2">
+                <li v-for="(node, i) in orderedNodes" :key="node.id" class="mb-1">
+                  <button
+                    type="button"
+                    class="w-full rounded-md border px-2 py-1.5 text-left transition"
+                    :class="
+                      selectedNodeId === node.id
+                        ? 'border-onbober-primary/50 bg-onbober-primary/5'
+                        : 'border-transparent hover:border-slate-700 hover:bg-slate-800/50'
+                    "
+                    @click="onNodeClick(node)"
+                  >
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                        :class="
+                          selectedNodeId === node.id
+                            ? 'bg-onbober-primary text-white'
+                            : 'bg-slate-800 text-slate-400'
+                        "
+                      >
+                        {{ i + 1 }}
+                      </span>
+                      <span class="min-w-0 flex-1 truncate text-xs font-medium text-slate-200">
+                        {{ nodeDisplayTitle(node) }}
+                      </span>
+                      <span
+                        v-if="hasHiddenChildren(node.id)"
+                        class="shrink-0 rounded bg-onbober-primary/20 px-1 text-[9px] font-bold uppercase text-onbober-primary"
+                      >
+                        +
+                      </span>
+                      <span class="shrink-0 text-[10px] uppercase text-slate-600">{{ kindLabel(node.kind) }}</span>
+                    </div>
+                    <p v-if="node.summary && node.summary !== nodeDisplayTitle(node)" class="mt-1 text-xs text-slate-400">
+                      {{ node.summary }}
+                    </p>
+                    <p v-if="node.code" class="mt-0.5 truncate font-mono text-[10px] text-slate-600">{{ node.code }}</p>
+                  </button>
+                </li>
+              </ol>
           </div>
 
           <ResizeHandle
@@ -408,36 +396,24 @@ const showExpandHint = computed(
       @pointerdown="onDetailResize"
     />
 
-    <button
-      v-if="hasDetailContent && !detailPanelOpen"
-      type="button"
-      class="flex w-8 shrink-0 flex-col items-center justify-center gap-1 border-l border-slate-800 bg-slate-900/60 text-slate-500 transition hover:bg-slate-800 hover:text-slate-200"
-      aria-label="Show details panel"
-      title="Show details"
-      @click="toggleDetailPanel"
-    >
-      <span class="text-sm">‹</span>
-      <span class="text-[9px] font-medium uppercase tracking-wide [writing-mode:vertical-rl]">Details</span>
-    </button>
-
     <aside
-      v-else-if="hasDetailContent && detailPanelOpen"
-      class="flex shrink-0 flex-col border-l border-slate-800 bg-slate-900"
-      :style="{ width: `${detailWidth}px` }"
+      class="detail-panel flex shrink-0 flex-col border-l border-slate-800 bg-slate-900"
+      :class="hasDetailContent && detailPanelOpen ? 'detail-panel-open' : 'detail-panel-closed'"
+      :style="hasDetailContent && detailPanelOpen ? { width: `${detailWidth}px` } : {}"
     >
-      <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-3 py-2">
-        <span class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Details</span>
-        <button
-          type="button"
-          class="rounded px-1.5 py-0.5 text-slate-500 hover:bg-slate-800 hover:text-white"
-          aria-label="Hide details panel"
-          title="Hide details"
-          @click="toggleDetailPanel"
-        >
-          ›
-        </button>
-      </div>
-      <div v-if="selectedNode" class="min-h-0 flex-1 overflow-y-auto p-4">
+        <div class="flex shrink-0 items-center justify-between border-b border-slate-800 px-3 py-2">
+          <span class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Details</span>
+          <button
+            type="button"
+            class="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-white"
+            aria-label="Hide details panel"
+            title="Hide details"
+            @click="toggleDetailPanel"
+          >
+            <svg class="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2l4 4-4 4"/></svg>
+          </button>
+        </div>
+        <div v-if="selectedNode" class="min-h-0 flex-1 overflow-y-auto p-4">
         <h3 class="font-semibold text-white">{{ nodeDisplayTitle(selectedNode) }}</h3>
 
         <section class="mt-3">
@@ -556,6 +532,28 @@ const showExpandHint = computed(
 </template>
 
 <style scoped>
+/* Steps panel: animate width so flex space moves with it */
+.steps-panel {
+  overflow: hidden;
+  transition: width 0.22s ease, opacity 0.22s ease;
+}
+.steps-panel-closed {
+  width: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Details panel: animate width from the right */
+.detail-panel {
+  overflow: hidden;
+  transition: width 0.22s ease, opacity 0.22s ease;
+}
+.detail-panel-closed {
+  width: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .mermaid-flow :deep(svg) {
   max-width: none;
   height: auto;

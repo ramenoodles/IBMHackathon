@@ -72,7 +72,19 @@ function onFileClick(): void {
       :style="{ paddingLeft: indent }"
       @click="onFolderClick"
     >
-      <span class="w-4 shrink-0 text-xs text-slate-500">{{ expanded ? '▼' : '▶' }}</span>
+      <svg
+        class="h-3 w-3 shrink-0 text-slate-500 transition-transform duration-150"
+        :class="expanded ? 'rotate-90' : ''"
+        viewBox="0 0 12 12"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M4 2l4 4-4 4" />
+      </svg>
       <img :src="getFolderIconUrl(entry.name, expanded)" alt="" class="h-4 w-4 shrink-0" />
       <span class="truncate text-slate-300">{{ entry.name }}</span>
     </button>

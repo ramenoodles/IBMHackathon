@@ -14,6 +14,7 @@ const props = defineProps<{
   hasPrevPage?: boolean
   currentPage?: number
   totalPages?: number
+  visible?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -61,6 +62,10 @@ function onInputBlur(): void {
 </script>
 
 <template>
+  <div
+    class="symbolbar-wrap"
+    :class="visible ? 'symbolbar-visible' : 'symbolbar-hidden'"
+  >
   <div v-if="filePath" class="flex items-center gap-2 border-b border-slate-800 bg-slate-900/80 px-4 py-2">
     <span class="shrink-0 text-xs text-slate-500">Trace</span>
 
@@ -141,9 +146,24 @@ function onInputBlur(): void {
       />
     </div>
   </div>
+  </div>
 </template>
 
 <style scoped>
+.symbolbar-wrap {
+  overflow: hidden;
+  transition: max-height 0.22s ease, opacity 0.22s ease;
+}
+.symbolbar-visible {
+  max-height: 56px;
+  opacity: 1;
+}
+.symbolbar-hidden {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .symbol-scroll {
   scrollbar-width: thin;
   scrollbar-color: #475569 transparent;
