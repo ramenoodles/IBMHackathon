@@ -116,6 +116,21 @@ Example request:
 
 The codebase root is configured by the server rather than supplied by API callers.
 
+## Watsonx Agent
+
+The Watsonx client can iteratively call repository tools before producing an answer:
+
+* `search_symbol` finds likely declarations with ripgrep.
+* `read_file` reads a file under the configured repository root.
+* `read_context` reads lines around a source location.
+
+Tool execution is limited to eight steps per request and tool output is capped to keep
+conversation context bounded. The `-root` and `-rg` server options configure the agent's
+repository and ripgrep executable.
+Set `INCLUDE_TRAJECTORY=true` or start the server with `-include-trajectory` to include the agent trajectory in
+explain responses. The `-include-trajectory` flag can be used as an explicit override; without either,
+the trajectory is not returned.
+
 ## Current limitations
 
 Search currently uses declaration-shaped regular expressions rather than a full language parser.

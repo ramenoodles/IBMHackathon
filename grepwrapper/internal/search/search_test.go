@@ -77,6 +77,37 @@ func TestFinderRejectsInvalidFunctionName(t *testing.T) {
 	}
 }
 
+func TestFinderReturnsNoMatchesAndHonorsLimit(t *testing.T) {
+	requireRipgrep(t)
+	root := t.TempDir()
+	writeTestFile(t, root, "a.go", "package sample\nfunc Parse() {}\n")
+	writeTestFile(t, root, "b.go", "package sample\nfunc Parse() {}\n")
+
+	noMatches, err := NewFinder("rg").Find(context.Background(), Query{Name: "Missing", Root: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(noMatches) != 0 {
+		t.Fatalf("noMatches = %#v", noMatches)
+	}
+	matches, err := NewFinder("rg").Find(context.Background(), Query{Name: "Parse", Root: root, Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("matches = %#v, want one result", matches)
+	}
+}
+
+func TestFinderRejectsInvalidRootAndMissingBinary(t *testing.T) {
+	if _, err := NewFinder("rg").Find(context.Background(), Query{Name: "Parse", Root: filepath.Join(t.TempDir(), "missing")}); err == nil {
+		t.Fatal("Find() accepted missing root")
+	}
+	if _, err := NewFinder("definitely-not-a-command").Find(context.Background(), Query{Name: "Parse", Root: t.TempDir()}); err == nil {
+		t.Fatal("Find() accepted missing ripgrep binary")
+	}
+}
+
 func requireRipgrep(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("rg"); err != nil {

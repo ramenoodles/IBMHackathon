@@ -29,16 +29,18 @@ type LookupResult struct {
 }
 
 type Service struct {
-	root   string         // which codebase we are allowed to inspect
-	finder *search.Finder // finds declarations using ripgrep
-	reader *source.Reader // reads the source code from the files finder locations
-	llm    llmclient.Client
+	root              string         // which codebase we are allowed to inspect
+	finder            *search.Finder // finds declarations using ripgrep
+	reader            *source.Reader // reads the source code from the files finder locations
+	llm               llmclient.Client
+	includeTrajectory bool // whether the agent's trajectory should be included in the response
 }
 
 func New(
 	root string,
 	rgBinary string,
 	client llmclient.Client,
+	includeTrajectory bool,
 ) (*Service, error) {
 	reader, err := source.NewReader(root)
 	if err != nil {
@@ -46,10 +48,11 @@ func New(
 	}
 
 	return &Service{
-		root:   root,
-		finder: search.NewFinder(rgBinary),
-		reader: reader,
-		llm:    client,
+		root:              root,
+		finder:            search.NewFinder(rgBinary),
+		reader:            reader,
+		llm:               client,
+		includeTrajectory: includeTrajectory,
 	}, nil
 }
 

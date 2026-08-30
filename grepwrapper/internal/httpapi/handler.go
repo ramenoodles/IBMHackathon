@@ -43,20 +43,12 @@ func (server *Server) lookup(
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(
-			w,
-			"invalid JSON",
-			http.StatusBadRequest,
-		)
+		writeError(w, http.StatusBadRequest, errorCodeInvalidJSON, "invalid JSON")
 		return
 	}
 
 	if request.Name == "" {
-		http.Error(
-			w,
-			"name is required",
-			http.StatusBadRequest,
-		)
+		writeError(w, http.StatusBadRequest, errorCodeMissingName, "name is required")
 		return
 	}
 
@@ -72,11 +64,7 @@ func (server *Server) lookup(
 		},
 	)
 	if err != nil {
-		http.Error(
-			w,
-			err.Error(),
-			http.StatusInternalServerError,
-		)
+		writeError(w, http.StatusInternalServerError, errorCodeLookupFailed, err.Error())
 		return
 	}
 
@@ -107,20 +95,12 @@ func (server *Server) explain(
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(
-			w,
-			"invalid JSON",
-			http.StatusBadRequest,
-		)
+		writeError(w, http.StatusBadRequest, errorCodeInvalidJSON, "invalid JSON")
 		return
 	}
 
 	if strings.TrimSpace(request.Name) == "" {
-		http.Error(
-			w,
-			"name is required",
-			http.StatusBadRequest,
-		)
+		writeError(w, http.StatusBadRequest, errorCodeMissingName, "name is required")
 		return
 	}
 
@@ -138,25 +118,13 @@ func (server *Server) explain(
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrLLMUnavailable):
-			http.Error(
-				w,
-				err.Error(),
-				http.StatusServiceUnavailable,
-			)
+			writeError(w, http.StatusServiceUnavailable, errorCodeLLMUnavailable, err.Error())
 
 		case errors.Is(err, service.ErrSymbolNotFound):
-			http.Error(
-				w,
-				err.Error(),
-				http.StatusNotFound,
-			)
+			writeError(w, http.StatusNotFound, errorCodeSymbolNotFound, err.Error())
 
 		default:
-			http.Error(
-				w,
-				err.Error(),
-				http.StatusInternalServerError,
-			)
+			writeError(w, http.StatusInternalServerError, errorCodeInternal, err.Error())
 		}
 
 		return
