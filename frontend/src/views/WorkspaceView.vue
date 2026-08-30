@@ -130,6 +130,8 @@ function onDeclineFlowInit(): void {
 
 function onConfirmFlowInit(): void {
   workspacePhase.value = 'tracing'
+  const first = currentPageSymbols.value[0]
+  if (first) void onPickSymbol(first.name)
 }
 
 async function onPickSymbol(name: string): Promise<void> {
